@@ -45,6 +45,8 @@ Speaker separation is approximate: short/overlapping turns and similar voices ca
 
 Development and automated verification were performed on Windows. Real English speech samples were processed locally, including two-speaker separation, repeated speaker matching, silence rejection, microphone labeling, and the full Electron AudioWorklet → native helper → draft → mind-map flow. The OS audio source was substituted with a real-audio MediaStream during automation, so no developer microphone or meeting was recorded.
 
-**Mac hardware capture, Apple permission prompts, signing, and the arm64 DMG require validation on a Mac.** The project is configured for this target but a Mac binary has not been built or run on this Windows machine. On your Mac, run `npm run test:speech` before `npm run test:e2e`, then follow the live-call steps above to verify native capture.
+Version 0.6.4 was built and tested on GitHub's Apple Silicon macOS 14 runner. The DMG and ZIP were produced successfully; the packaged app passed note editing, persistence, themes, vector search, native English transcription, and two-speaker separation with model downloads blocked and a fresh user-data folder. The application's ad-hoc code signature passed strict verification. [Build and test evidence](https://github.com/lwillard/ointel/actions/runs/35180225598).
+
+**Real Mac system-audio capture and Apple permission prompts still require validation on your Mac.** Automated speech checks use a recording fixture, not a live Zoom call. Follow the live-call steps above; a source checkout or npm is not needed to use the offline installer.
 
 Reference: [Electron native system audio requirements](https://www.electronjs.org/docs/latest/api/desktop-capturer).

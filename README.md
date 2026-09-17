@@ -119,4 +119,4 @@ Electron uses context isolation, sandboxing, disabled Node integration, narrow v
 
 Developer/test overrides: `OINTEL_DATA_DIR` sets a separate workspace directory; `OINTEL_MODEL_CACHE` sets a shared embedding-model cache; `OINTEL_SPEECH_MODELS` sets the local speech-model directory. `OINTEL_TEST_MODE=1` starts the window hidden for automated tests. Run `npm run test:speech` before the live desktop workflow to fetch its public speech sample and models.
 
-Packages are development builds; no signing/notarization credentials or automatic updates are configured. Mac packaging is configured for Apple Silicon and must be built and validated on a Mac. Windows automated tests do not establish native Mac capture compatibility.
+The offline Apple Silicon release is built and tested on a macOS 14 ARM64 runner, including packaged search and speech with model downloads disabled. It is ad-hoc signed, not Apple Developer notarized. Native live-call capture and permission prompts still need validation on the destination Mac. No automatic updates are configured. See [Mac validation details](MAC-SETUP.md) and the [dependency security review](SECURITY-REVIEW.md).
