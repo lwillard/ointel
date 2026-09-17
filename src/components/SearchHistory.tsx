@@ -1,0 +1,5 @@
+import type { SearchHistoryEntry } from '../types';
+export function SearchHistory({ entries, onRepeat, onClear }: { entries: SearchHistoryEntry[]; onRepeat: (entry: SearchHistoryEntry) => void; onClear: () => void }) {
+  if (!entries.length) return null;
+  return <details className="search-history"><summary>Search history <span>{entries.length}</span></summary><div className="search-history-heading"><span>Saved on this device</span><button className="text-button" onClick={onClear}>Clear search history</button></div><div className="search-history-list">{entries.map((entry, index) => <button key={`${entry.searchedAt}-${index}`} aria-label={`Repeat search ${entry.query}`} onClick={() => onRepeat(entry)}><strong>{entry.query}</strong><span>{entry.query.startsWith('#') ? `Tags · cutoff ${entry.cutoff.toFixed(2)}` : entry.mode === 'semantic' ? 'Vector search' : 'Exact text'}{entry.includeHistory ? ' · saved versions' : ''} · {new Date(entry.searchedAt).toLocaleString()}</span></button>)}</div></details>;
+}

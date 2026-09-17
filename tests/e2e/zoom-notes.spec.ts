@@ -1,0 +1,52 @@
+import { test, expect, _electron as electron } from '@playwright/test';
+import path from 'node:path';
+import { readFile } from 'node:fs/promises';
+
+test('Zoom transcript review, speaker correction, linked Markdown notes, search, undo and persistence', async () => {
+  const directory = path.resolve(`.test-data/zoom-notes-${Date.now()}`);
+  const app = await electron.launch({ args: ['.'], env: { ...process.env, OINTEL_DATA_DIR: directory, OINTEL_MODEL_CACHE: path.resolve('.test-data/vectors/models'), OINTEL_TEST_MODE: '1' } });
+  const page = await app.firstWindow();
+  const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
+  const transcript = 'WEBVTT\n\n1\n00:00:01.000 --> 00:00:06.000\nAlice: We decided to cultivate tomatoes on the apartment balcony.\n\n2\n00:00:07.000 --> 00:00:12.000\nBob: I will collect compost and prepare the growing containers.\n\n3\n00:00:13.000 --> 00:00:16.000\nAlice: We need to buy seeds before Friday.\n\n4\n00:00:17.000 --> 00:00:20.000\nAn unlabeled speaker remains unknown.';
+  try {
+    await page.getByRole('button', { name: 'Zoom notes', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Zoom meeting notes' });
+    await dialog.getByRole('button', { name: 'Transcript file', exact: true }).click();
+    await dialog.getByLabel('Zoom transcript file').setInputFiles({ name: 'Garden meeting.vtt', mimeType: 'text/vtt', buffer: Buffer.from(transcript) });
+    await expect(dialog).toContainText('3 speakers · 4 passages');
+    await expect(dialog).toContainText('Some passages have no speaker label');
+    await dialog.getByLabel('Speaker name for Bob').fill('Robert');
+    await dialog.getByLabel('Meeting title', { exact: true }).fill('Apartment gardening meeting');
+    await dialog.getByLabel('Meeting date', { exact: true }).fill('2026-09-16');
+    await dialog.getByLabel('Connect this meeting to the selected card').check();
+    await page.screenshot({ path: 'artifacts/ointel-zoom-import.png' });
+    await dialog.getByRole('button', { name: 'Add meeting notes to map', exact: true }).click();
+    await expect(page.locator('.idea-card')).toHaveCount(10);
+    await expect(page.locator('.react-flow__edge')).toHaveCount(9);
+    await expect(page.locator('.inspector .markdown')).toContainText('Quoted highlights');
+    await page.locator('.inspector').getByRole('link', { name: 'Robert', exact: true }).click();
+    await expect(page.getByLabel('Node title', { exact: true })).toHaveValue('Robert · Apartment gardening meeting');
+    await expect(page.locator('.inspector .markdown')).toContainText('compost');
+    await expect(page.locator('.inspector .markdown')).not.toContainText('buy seeds');
+    await page.locator('.inspector').getByRole('link', { name: 'Back to meeting', exact: true }).click();
+    await page.getByRole('button', { name: 'Undo', exact: true }).click();
+    await expect(page.locator('.idea-card')).toHaveCount(6);
+    await page.getByRole('button', { name: 'Redo', exact: true }).click();
+    await expect(page.locator('.idea-card')).toHaveCount(10);
+    await expect.poll(async () => JSON.parse(await readFile(path.join(directory, 'workspace.json'), 'utf8')).nodes.length).toBe(10);
+    const saved = JSON.parse(await readFile(path.join(directory, 'workspace.json'), 'utf8'));
+    const meeting = saved.nodes.find((node: { cardType: string }) => node.cardType === 'Meeting');
+    expect(await readFile(path.join(directory, `notes/${meeting.id}.md`), 'utf8')).toContain('Robert');
+    await expect.poll(async () => (await page.evaluate(() => window.ointel!.vectorStatus())).state, { timeout: 90000 }).toBe('ready');
+    const results = await page.evaluate(() => window.ointel!.search('growing vegetables on a terrace with compost', false));
+    expect(results.some(result => result.nodeId === meeting.id)).toBe(true);
+    await page.reload();
+    await page.getByRole('button', { name: 'Zoom notes', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Transcript file', exact: true }).click();
+    await dialog.getByLabel('Zoom transcript file').setInputFiles({ name: 'Garden meeting.vtt', mimeType: 'text/vtt', buffer: Buffer.from(transcript) });
+    await expect(dialog.getByRole('button', { name: 'Already imported into this map', exact: true })).toBeDisabled();
+    await dialog.getByRole('button', { name: 'Zoom cloud', exact: true }).click();
+    await expect(dialog.getByLabel('Zoom Public Client ID')).toBeVisible();
+    expect(errors).toEqual([]);
+  } finally { await app.evaluate(({ app }) => app.exit()); }
+});

@@ -1,0 +1,32 @@
+import { ensureSpeechModels } from '../electron/speech-models.mjs';
+import { createRequire } from 'node:module';
+import { mkdir, writeFile, readFile } from 'node:fs/promises';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+const require = createRequire(import.meta.url);
+const directory = path.resolve('.test-data/speech');
+await ensureSpeechModels(path.join(directory, 'models'), n => process.stdout.write(`\rSpeech models: ${n}%`));
+await mkdir(directory, { recursive: true });
+const file = path.join(directory, 'two-speakers.wav');
+try { await readFile(file); } catch {
+  const response = await fetch('https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-segmentation-models/1-two-speakers-en.wav');
+  if (!response.ok) throw new Error(`Sample download failed: ${response.status}`);
+  await writeFile(file, Buffer.from(await response.arrayBuffer()));
+}
+const sherpa = require('sherpa-onnx-node');
+const { createSpeechEngine } = require('../electron/speech-engine.cjs');
+const engine = createSpeechEngine(path.join(directory, 'models'));
+const wave = sherpa.readWave(file);
+assert.equal(wave.sampleRate, 16000);
+const started = performance.now();
+const cues = engine.process({ samples: wave.samples, channel: 'system', start: 10 });
+assert.equal(new Set(cues.map(c => c.speaker)).size, 2);
+assert.match(cues.map(c => c.text).join(' '), /steady green flame/i);
+assert.ok(cues.every(c => c.start >= 10 && c.end > c.start));
+const again = engine.process({ samples: wave.samples, channel: 'system', start: 30 });
+assert.deepEqual(again.map(c => c.speaker), cues.map(c => c.speaker));
+assert.deepEqual(engine.process({ samples: new Float32Array(160000), channel: 'system', start: 50 }), []);
+const mic = engine.process({ samples: wave.samples, channel: 'mic', start: 60 });
+assert.ok(mic.length && mic.every(c => c.speaker === 'You'));
+console.log(`\nReal speech, two voices, stable labels, silence rejection and microphone channel passed (${((performance.now() - started) / 1000).toFixed(1)}s).`);
+console.log(cues);
