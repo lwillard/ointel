@@ -22,7 +22,9 @@ jobs:
           node scripts/check-mac.cjs
           npm test
       - name: Audit all runtime, development, optional, and peer dependencies
-        run: npm run security:audit
+        run: |
+          npm run security:audit
+          npm audit signatures --json > security-reports/npm-signatures.json
       - name: Verify real speech and download build-time models
         run: npm run test:speech
       - name: Build self-contained DMG and ZIP
@@ -40,7 +42,7 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           cd release
           shasum -a 256 *.dmg *.zip > SHA256SUMS.txt
-          gh release create "v$VERSION" *.dmg *.zip SHA256SUMS.txt ../security-reports/npm-audit.json ../security-reports/dependencies.cdx.json --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "Ointel $VERSION — Offline Apple Silicon" --notes-file ../OFFLINE-PACKAGE.md
+          gh release create "v$VERSION" *.dmg *.zip SHA256SUMS.txt ../security-reports/*.json --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "Ointel $VERSION — Offline Apple Silicon" --notes-file ../OFFLINE-PACKAGE.md
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:

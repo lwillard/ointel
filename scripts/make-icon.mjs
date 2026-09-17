@@ -1,7 +1,7 @@
 import sharp from 'sharp';
 import { writeFile } from 'node:fs/promises';
 const png = await sharp('build/icon.svg').resize(256, 256).png().toBuffer();
-await writeFile('build/icon.png', png);
+await sharp('build/icon.svg', { density: 288 }).resize(1024, 1024).png().toFile('build/icon.png');
 const header = Buffer.alloc(22);
 header.writeUInt16LE(1, 2); header.writeUInt16LE(1, 4);
 header.writeUInt16LE(1, 10); header.writeUInt16LE(32, 12);

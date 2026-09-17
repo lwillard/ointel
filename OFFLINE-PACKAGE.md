@@ -11,3 +11,5 @@ In Zoom notes → Live audio, **Prepare local speech** verifies and loads the in
 Mind maps, Markdown notes, pasted images, history, vector search, and local transcription work offline. Optional Zoom cloud imports, external web links, and externally hosted images still need their respective network access. Paste images into notes to store them locally.
 
 SHA256SUMS.txt provides checksums for the installers. Model licenses and notices are included under Ointel.app/Contents/Resources/models/licenses.
+
+The release includes npm and OSV dependency-advisory reports, registry-signature verification results, and a CycloneDX dependency inventory. Publication stops if those checks fail or either advisory database reports a vulnerability. These checks cover known advisories at build time; they cannot guarantee the absence of undiscovered vulnerabilities.
