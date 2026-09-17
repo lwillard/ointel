@@ -18,13 +18,14 @@ async function valid(file, model) {
   for await (const data of createReadStream(file)) hash.update(data);
   return hash.digest('hex') === model.sha;
 }
-export async function ensureSpeechModels(directory, progress = () => {}) {
-  await mkdir(directory, { recursive: true });
+export async function ensureSpeechModels(directory, progress = () => {}, { allowDownload = true } = {}) {
+  if (allowDownload) await mkdir(directory, { recursive: true });
   const total = speechModels.reduce((n, m) => n + m.size, 0);
   let complete = 0;
   for (const model of speechModels) {
     const file = path.join(directory, model.name);
     if (!await valid(file, model)) {
+      if (!allowDownload) throw new Error(`Bundled speech model ${model.name} is missing or damaged. Reinstall the complete offline package.`);
       const temporary = file + '.download';
       const response = await fetch(model.url, { signal: AbortSignal.timeout(600000) });
       if (!response.ok || !response.body) throw new Error(`Model download failed (${response.status}). Retry when connected.`);

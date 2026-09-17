@@ -3,10 +3,11 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 const application = await electron.launch({ executablePath: path.resolve(process.env.OINTEL_PACKAGED_APP || (process.platform === 'darwin' ? 'release/mac-arm64/Ointel.app/Contents/MacOS/Ointel' : 'release/win-unpacked/Ointel.exe')),
-  env: { ...process.env, OINTEL_DATA_DIR: path.resolve(`.test-data/packaged-${Date.now()}`), OINTEL_MODEL_CACHE: path.resolve('.test-data/vectors/models'), OINTEL_SPEECH_MODELS: path.resolve('.test-data/speech/models'), OINTEL_TEST_MODE: '1' },
+  env: { ...process.env, OINTEL_DATA_DIR: path.resolve(`.test-data/packaged-${Date.now()}`), OINTEL_TEST_MODE: '1', OINTEL_TEST_OFFLINE: '1' },
 });
 try {
   const page = await application.firstWindow();
+  await page.route(/^https?:\/\//, route => route.abort());
   await page.getByLabel('Map title').waitFor();
   console.log('Runtime', await application.evaluate(({ app }) => ({ directory: process.env.OINTEL_DATA_DIR, packaged: app.isPackaged })));
   console.log('Packaged renderer and secure bridge loaded.');
@@ -59,6 +60,7 @@ try {
     await window.ointel.speechStop();
   }, samples);
   const spoken = await page.evaluate(() => window.ointel.speechStatus());
+  assert.equal(spoken.bundled, true);
   assert.match(spoken.draft.cues.map(c => c.text).join(' '), /steady green flame/i);
   assert.equal(new Set(spoken.draft.cues.map(c => c.speaker)).size, 2);
   await page.evaluate(() => window.ointel.speechDiscard());

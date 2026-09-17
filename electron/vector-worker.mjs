@@ -7,6 +7,14 @@ import { tagQuery } from '../shared/tags.mjs';
 
 env.cacheDir = process.env.OINTEL_MODEL_CACHE || path.join(workerData.directory, 'models');
 env.allowLocalModels = false;
+const bundledModels = process.env.OINTEL_BUNDLED_MODELS;
+if (bundledModels) {
+  env.localModelPath = path.join(bundledModels, 'vectors') + path.sep;
+  env.allowLocalModels = true;
+  env.allowRemoteModels = false;
+  env.useFSCache = false;
+}
+if (process.env.OINTEL_TEST_MODE === '1' && process.env.OINTEL_TEST_OFFLINE === '1') globalThis.fetch = async () => { throw new Error('Network disabled for packaged offline test'); };
 const indexPath = path.join(workerData.directory, 'vector-index.json');
 let cache = {};
 let documents = [];
@@ -85,7 +93,7 @@ async function drain() {
       if (latestWorkspace) {
         const workspace = latestWorkspace; latestWorkspace = undefined;
         try { await indexWorkspace(workspace); indexError = undefined; }
-        catch (error) { indexError = error; status({ state: 'error', message: `Vector search unavailable: ${error.message}. Check your connection for the first model download, then retry.` }); }
+        catch (error) { indexError = error; status({ state: 'error', message: `Vector search unavailable: ${error.message}. ${bundledModels ? 'The bundled search model could not load. Reinstall the complete offline package, then retry.' : 'Check your connection for the first model download, then retry.'}` }); }
       } else {
         const query = queries.shift();
         try {

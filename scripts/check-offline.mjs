@@ -1,7 +1,7 @@
 import { Worker } from 'node:worker_threads';
 import path from 'node:path';
 import assert from 'node:assert/strict';
-const directory = path.resolve('.test-data/vectors');
+const directory = path.resolve(process.env.OINTEL_BUNDLED_MODELS ? `.test-data/offline-bundled-${Date.now()}` : '.test-data/vectors');
 const entry = new URL('../electron/vector-worker.mjs', import.meta.url).href;
 // Block every network fetch in this fresh worker, including model metadata requests.
 const worker = new Worker(`globalThis.fetch = async () => { throw new Error('Network disabled for offline test'); }; import(${JSON.stringify(entry)});`, { eval: true, workerData: { directory } });

@@ -32,7 +32,7 @@ export interface ZoomConnection { connected: boolean; clientId: string; connecti
 export interface ZoomRecording { key: string; title: string; date: string; recordingId: string; meetingUuid: string }
 export interface LiveCue { speaker: string; text: string; start: number; end: number }
 export interface LiveDraft { id: string; title: string; date: string; cues: LiveCue[]; names: Record<string, string>; microphone: boolean }
-export interface SpeechStatus { ready: boolean; active: boolean; preparing: boolean; stopping: boolean; progress: number; pending: number; message: string; error: string; draft: LiveDraft | null; platform: string; arch: string }
+export interface SpeechStatus { bundled?: boolean; ready: boolean; active: boolean; preparing: boolean; stopping: boolean; progress: number; pending: number; message: string; error: string; draft: LiveDraft | null; platform: string; arch: string }
 declare global {
   interface Window {
     ointel?: {

@@ -3,11 +3,12 @@ const fs = require('node:fs/promises');
 const { randomUUID } = require('node:crypto');
 
 exports.createSpeechService = ({ directory, modelDirectory, fork, onStatus }) => {
-  let worker, nextId = 0, ready = false, active = false, stopping, preparing, draft = null, message = 'Download the local speech models to get started.', error = '', progress = 0;
+  const bundled = !!process.env.OINTEL_BUNDLED_MODELS;
+  let worker, nextId = 0, ready = false, active = false, stopping, preparing, draft = null, message = bundled ? 'Speech models are included. Prepare local speech to load them.' : 'Download the local speech models to get started.', error = '', progress = 0;
   let pendingAudio = 0, writeChain = Promise.resolve(), lastEnd = {}, initialized = false;
   const pending = new Map(), jobs = new Set();
   const draftPath = path.join(directory, 'live-meeting.json');
-  const status = () => ({ ready, active, preparing: !!preparing, stopping: !!stopping, progress, pending: pendingAudio, message, error, draft, platform: process.platform, arch: process.arch });
+  const status = () => ({ ready, active, bundled, preparing: !!preparing, stopping: !!stopping, progress, pending: pendingAudio, message, error, draft, platform: process.platform, arch: process.arch });
   const emit = () => onStatus(status());
   async function load() {
     if (!initialized) {
@@ -42,7 +43,7 @@ exports.createSpeechService = ({ directory, modelDirectory, fork, onStatus }) =>
     worker = child;
     child.stdout?.resume(); child.stderr?.resume();
     child.on('message', data => {
-      if ('progress' in data) { progress = data.progress; message = progress < 100 ? `Downloading speech models · ${progress}%` : 'Loading local speech models…'; emit(); return; }
+      if ('progress' in data) { progress = data.progress; message = progress < 100 ? `${bundled ? 'Checking included' : 'Downloading'} speech models · ${progress}%` : 'Loading local speech models…'; emit(); return; }
       const request = pending.get(data.id); if (!request) return;
       clearTimeout(request.timer); pending.delete(data.id);
       if (data.error) request.reject(new Error(data.error)); else request.resolve(data.result);

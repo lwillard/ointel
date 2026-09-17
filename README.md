@@ -2,6 +2,10 @@
 
 A local Electron mind-map workspace with Markdown notes, version history, and semantic vector search. The interface uses a warm paper canvas, muted color palettes, and a persistent note inspector.
 
+## Install without dependency downloads
+
+Use the Apple Silicon DMG or ZIP from [GitHub Releases](https://github.com/lwillard/ointel/releases). It includes Electron, native dependencies, and all search and speech models. See [offline package instructions](OFFLINE-PACKAGE.md). Source builds below require downloads on the build machine.
+
 ## Run
 
 Requires **Node.js 22.12 or later** (Node 24 LTS recommended).
@@ -11,7 +15,7 @@ npm install
 npm start
 ```
 
-Electron downloads its runtime on first launch. For live development, run `npm run electron:dev`. `npm run dev` opens a browser development server; that preview uses browser storage and exact-text search. Local files and vector search run in the Electron app.
+Installing source dependencies downloads Electron; the finished offline installer already includes it. For live development, run `npm run electron:dev`. `npm run dev` opens a browser development server; that preview uses browser storage and exact-text search. Local files and vector search run in the Electron app.
 
 ```sh
 npm run package       # Installer for the current platform in release/
@@ -49,7 +53,7 @@ npm run test:e2e      # Full desktop workflow; requires the built renderer
 
 Choose **Zoom notes → Live audio** to transcribe a call as it happens. The primary target is **Apple Silicon, macOS 14.2+**, with Windows system audio capture also wired up. Read [Mac setup and validation status](MAC-SETUP.md) for build, permissions, and usage. Live audio works independently of Zoom's cloud-recording and transcript features: it captures system output, processes English speech locally, separates approximate speaker turns, and checkpoints the live text on disk. Optional microphone capture labels your speech as **You** and is independent of Zoom mute. Use headphones to reduce duplicate speech. All system sounds can be captured; this is not a Zoom-only audio tap and cannot retrieve Zoom participant names.
 
-Download the local models once using **Prepare local speech** (about 135 MB), then choose **Start live notes**. Text arrives in roughly 8–12 second batches plus inference time. The system meter and silence warning help detect missing audio. **Stop capture** flushes remaining audio; rename speaker labels and **Add live notes to map**. The draft remains recoverable until explicitly cleared, and full text can be exported. Completed passages are saved, but in-flight audio can be lost after a crash or overload. No audio files or screen images are saved or uploaded. See [models and notices](SPEECH-MODELS.md).
+In the offline installer, load the included models using **Prepare local speech** (source development builds download about 135 MB once), then choose **Start live notes**. Text arrives in roughly 8–12 second batches plus inference time. The system meter and silence warning help detect missing audio. **Stop capture** flushes remaining audio; rename speaker labels and **Add live notes to map**. The draft remains recoverable until explicitly cleared, and full text can be exported. Completed passages are saved, but in-flight audio can be lost after a crash or overload. No audio files or screen images are saved or uploaded. See [models and notices](SPEECH-MODELS.md).
 
 The older **Transcript file** and **Zoom cloud** tabs are optional import tools and are not needed for live capture. File import accepts Zoom `.vtt`, `.srt`, or speaker-labeled `.txt` (up to 4 MB). Preview timestamps and speakers, correct names, and optionally create one linked card per speaker. Giving two speaker labels the same name merges their speaker cards. Unlabeled imported text remains **Unknown speaker**.
 
@@ -77,7 +81,7 @@ Tags are vectorized separately as well. Search a single `#tag` in the search win
 **Search history** retains the 50 most recent distinct queries in the workspace, including mode, saved-version preference, timestamp, and tag cutoff. Expand Search history to repeat a query or clear the list. It survives restarts and travels with exported workspace backups. Repeated queries move to the top. Active map highlights are temporary and clear on restart.
 
 - Model: [`Xenova/all-MiniLM-L6-v2`](https://huggingface.co/Xenova/all-MiniLM-L6-v2), quantized Q8, 384 dimensions, mean pooling and normalization, through [Transformers.js](https://huggingface.co/docs/transformers.js).
-- Inference runs on the CPU in a Node worker thread, so the editor remains responsive. The model downloads from Hugging Face once (roughly 23 MB of weights plus tokenizer/configuration) into the local model cache. Notes and queries are never sent to an embedding service. The initial download needs internet access; subsequent use works from the cache.
+- Inference runs on the CPU in a Node worker thread, so the editor remains responsive. The offline installer includes the model (roughly 23 MB of weights plus tokenizer/configuration); source development builds download it once into the local cache. Notes and queries are never sent to an embedding service. Packaged builds disable remote model loading and use the included files directly, including on first launch.
 - Titles get a dedicated vector. Bodies are converted to plain visible text, then split into 180-token windows with 36-token overlap, with title context added to each window. All windows are indexed, including the end of long notes. Image alt text is indexed; screenshot pixels are **not OCR'd**.
 - Content hashes avoid recomputing unchanged text and reuse embeddings for matching revisions. Edits and restores refresh the index; removed nodes disappear from retrieval. Persisted caches are validated and corrupt entries are rebuilt.
 - Search ranks by maximum cosine similarity across each document's chunks. The displayed similarity is a cosine score, not a probability. Current notes are searched by default; **Include saved versions** extends the search to history. Historical results open a read-only version preview.

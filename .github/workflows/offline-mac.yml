@@ -1,0 +1,52 @@
+name: Build offline Apple Silicon package
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  mac:
+    runs-on: macos-14
+    timeout-minutes: 45
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install build dependencies on GitHub
+        run: npm ci
+      - name: Check native architecture and unit tests
+        run: |
+          node scripts/check-mac.cjs
+          npm test
+      - name: Audit all runtime, development, optional, and peer dependencies
+        run: npm run security:audit
+      - name: Verify real speech and download build-time models
+        run: npm run test:speech
+      - name: Build self-contained DMG and ZIP
+        run: npm run package:mac
+      - name: Verify model loading without network or an existing user cache
+        run: OINTEL_BUNDLED_MODELS="$PWD/build/offline-models" npm run test:offline
+      - name: Verify packaged editing, semantic search, and speech without model downloads
+        run: npm run test:package
+      - name: Verify application signature
+        run: codesign --verify --deep --strict --verbose=2 release/mac-arm64/Ointel.app
+      - name: Publish verified offline installers
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          cd release
+          shasum -a 256 *.dmg *.zip > SHA256SUMS.txt
+          gh release create "v$VERSION" *.dmg *.zip SHA256SUMS.txt ../security-reports/npm-audit.json ../security-reports/dependencies.cdx.json --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "Ointel $VERSION — Offline Apple Silicon" --notes-file ../OFFLINE-PACKAGE.md
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: offline-mac-build-logs
+          path: |
+            release/builder-debug.yml
+            release/builder-effective-config.yaml
+            security-reports/
+          if-no-files-found: ignore

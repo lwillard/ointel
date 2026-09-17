@@ -1,6 +1,6 @@
 {
   "name": "ointel",
-  "version": "0.6.3",
+  "version": "0.6.4",
   "private": true,
   "engines": {
     "node": ">=22.12.0"
@@ -18,9 +18,11 @@
     "test:vectors": "node scripts/check-vectors.mjs",
     "test:offline": "node scripts/check-offline.mjs",
     "test:package": "node scripts/smoke-packaged.mjs",
-    "package": "npm run build && electron-builder",
-    "package:mac": "node scripts/check-mac.cjs && npm run build && electron-builder --mac --arm64",
-    "test:speech": "node scripts/check-speech.mjs"
+    "package": "npm run prepare:offline && npm run build && electron-builder",
+    "package:mac": "node scripts/check-mac.cjs && npm run prepare:offline && npm run build && electron-builder --mac --arm64 --publish never",
+    "test:speech": "node scripts/check-speech.mjs",
+    "prepare:offline": "node scripts/prepare-offline-models.mjs",
+    "security:audit": "node scripts/audit-dependencies.cjs"
   },
   "dependencies": {
     "@dagrejs/dagre": "^1.1.5",
@@ -106,7 +108,9 @@
         "NSAudioCaptureUsageDescription": "Ointel transcribes audio playing on this Mac into local meeting notes when you start live capture.",
         "NSMicrophoneUsageDescription": "Ointel includes your voice in local meeting notes only when you enable the microphone.",
         "NSScreenCaptureUsageDescription": "Ointel uses the system capture session to access meeting audio. Screen images are not saved."
-      }
+      },
+      "identity": "-",
+      "notarize": false
     },
     "win": {
       "icon": "build/icon.ico",
@@ -116,6 +120,17 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
-    }
+    },
+    "extraResources": [
+      {
+        "from": "build/offline-models",
+        "to": "models",
+        "filter": [
+          "**/*",
+          "!**/*.download"
+        ]
+      }
+    ],
+    "beforePack": "./scripts/verify-offline-models.cjs"
   }
 }

@@ -2,7 +2,11 @@
 
 Target: **Apple Silicon, macOS 14.2 or newer**. Live notes use Electron 44's native CoreAudio system-audio capture, local Whisper speech recognition, and local speaker separation. Zoom cloud recordings, Zoom transcripts, and a Zoom account connection are not required.
 
-## Build and open on your Mac
+## Install the offline package
+
+Download the arm64 DMG or ZIP from [GitHub Releases](https://github.com/lwillard/ointel/releases). No npm, Node.js, or model download is needed on your Mac. Read [installation and signing details](OFFLINE-PACKAGE.md).
+
+## Build from source on your Mac
 
 Install an **arm64 Node.js 22.12+** runtime (Node 24 recommended). Copy this project to the Mac, without `node_modules`, `dist`, `.test-data`, or `release`. In Terminal, from the project folder:
 
@@ -14,12 +18,12 @@ open release
 
 Open the generated arm64 DMG, copy **Ointel.app** to Applications, and launch that app directly. The package includes the microphone and system-audio usage descriptions required by macOS. `npm start` launches the generic development Electron bundle; its parent Terminal/IDE may lack the audio usage description, resulting in a silent stream. Use the packaged app to test real Mac capture.
 
-This is a development build. Without your Apple Developer signing identity and notarization credentials, it is not a signed/notarized distribution release. No signing credentials are included in this project. Electron Builder can use your configured signing identity when available. Native speech libraries and their runtime are unpacked outside ASAR; a separate speech helper prevents conflicts with the vector-search runtime.
+This package is ad-hoc signed and is not an Apple Developer notarized distribution release. No signing credentials are included in this project. For a Developer ID distribution, override the ad-hoc signing identity and configure notarization credentials on the build machine. Native speech libraries and their runtime are unpacked outside ASAR; a separate speech helper prevents conflicts with the vector-search runtime.
 
 ## Take live notes
 
 1. Join the call normally in Zoom and use headphones.
-2. In Ointel, select **Zoom notes → Live audio → Prepare local speech**. The first setup downloads about 135 MB of verified model files. Subsequent recognition works offline.
+2. In Ointel, select **Zoom notes → Live audio → Prepare local speech**. The offline installer verifies and loads included models without downloading them. Source development builds download about 135 MB once. Subsequent recognition works offline.
 3. Set a meeting title. Optionally enable **Include my microphone as “You”**. This microphone is independent of Zoom's mute button.
 4. Select **Start live notes**. Approve Ointel's system-audio / screen-recording permission and, if enabled, microphone permission in macOS. Restart Ointel if macOS requests it.
 5. Check the System audio meter while someone speaks. Text arrives in roughly 8–12 second batches plus processing time. Rename speaker labels as needed; identical names merge speaker cards.

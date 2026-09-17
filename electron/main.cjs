@@ -10,6 +10,7 @@ const hasLock = process.env.OINTEL_TEST_MODE === '1' || app.requestSingleInstanc
 if (!hasLock) app.quit();
 app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
 if (hasLock) app.whenReady().then(async () => {
+  if (app.isPackaged) process.env.OINTEL_BUNDLED_MODELS = path.join(process.resourcesPath, 'models');
   const { createStore } = await import('./storage.mjs');
   const store = createStore(process.env.OINTEL_DATA_DIR || path.join(app.getPath('userData'), 'workspace'));
   const { createZoomService } = await import('./zoom-service.mjs');
@@ -22,7 +23,7 @@ if (hasLock) app.whenReady().then(async () => {
   const handle = (name, callback) => ipcMain.handle(name, (event, ...args) => { trusted(event); return callback(...args); });
   const { nodeLinkClipboard } = await import('../shared/node-links.mjs');
   handle('node:copy-link', node => { const data = nodeLinkClipboard(node); return clipboard.write([new ClipboardItem({ 'text/plain': data.text, 'text/html': data.html })]); });
-  const speech = require('./speech-service.cjs').createSpeechService({ directory: path.join(store.directory, '.meetings'), modelDirectory: process.env.OINTEL_SPEECH_MODELS || path.join(app.getPath('userData'), 'speech-models'), fork: (...args) => utilityProcess.fork(...args), onStatus: status => { if (win && !win.isDestroyed()) win.webContents.send('speech:status', status); } });
+  const speech = require('./speech-service.cjs').createSpeechService({ directory: path.join(store.directory, '.meetings'), modelDirectory: process.env.OINTEL_BUNDLED_MODELS ? path.join(process.env.OINTEL_BUNDLED_MODELS, 'speech') : process.env.OINTEL_SPEECH_MODELS || path.join(app.getPath('userData'), 'speech-models'), fork: (...args) => utilityProcess.fork(...args), onStatus: status => { if (win && !win.isDestroyed()) win.webContents.send('speech:status', status); } });
   let captureUntil = 0, microphoneAllowed = false;
   const ownFrame = frame => frame === win?.webContents.mainFrame && frame?.url.split('#')[0] === page;
   session.defaultSession.setDisplayMediaRequestHandler(async (request, callback) => {
