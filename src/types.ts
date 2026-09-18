@@ -5,7 +5,7 @@ export interface NodeStyle {
 }
 export interface CardTheme { id: string; name: string; style: NodeStyle }
 export interface EdgeStyle {
-  color: string; width: number; path: 'bezier' | 'angular' | 'straight';
+  color: string; width: number; path: 'automatic' | 'bezier' | 'angular' | 'straight';
   line: 'solid' | 'dashed' | 'dotted'; arrow: boolean;
   startTerminator: Terminator; endTerminator: Terminator;
 }

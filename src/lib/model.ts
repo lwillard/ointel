@@ -6,7 +6,7 @@ export const defaultNodeStyle: NodeStyle = {
   background: '#ffffff', borderColor: '#dce3df', borderWidth: 1, borderStyle: 'solid',
   radius: 14, shadow: true, textColor: '#273b35', font: 'sans', fontSize: 16, bold: true, italic: false,
 };
-export const defaultEdgeStyle: EdgeStyle = { color: '#a4b6ac', width: 2, path: 'bezier', line: 'solid', arrow: false, startTerminator: 'none', endTerminator: 'none' };
+export const defaultEdgeStyle: EdgeStyle = { color: '#a4b6ac', width: 2, path: 'automatic', line: 'solid', arrow: false, startTerminator: 'none', endTerminator: 'none' };
 export const palettes = [
   { name: 'Sage', background: '#eaf1e9', borderColor: '#b5cbb8', textColor: '#345344' },
   { name: 'Lavender', background: '#f0ecf8', borderColor: '#cec0e7', textColor: '#655182' },

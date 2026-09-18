@@ -30,11 +30,11 @@ test('resize cards, undo bounds, keep pinned origins, edit, duplicate, and resto
   try {
     await focus();
     await expect(card.locator('.card-resize-handle')).toHaveCount(4);
-    const edge = page.locator('.react-flow__edge-path').first(); const oldPath = await edge.getAttribute('d');
+    const paths = () => page.locator('.react-flow__edge-path').evaluateAll(els => els.map(el => el.getAttribute('d'))); const oldPaths = await paths();
     await drag('bottom.right', 100, 80);
     await expect.poll(dimensions).toEqual({ width: 340, height: 240 });
     await expect.poll(async () => (await savedCard()).size).toEqual({ width: 340, height: 240 });
-    await expect(edge).not.toHaveAttribute('d', oldPath!);
+    await expect.poll(paths).not.toEqual(oldPaths);
     await page.getByRole('button', { name: 'Undo', exact: true }).click();
     await expect.poll(dimensions).toEqual({ width: 240, height: 160 });
     await page.getByRole('button', { name: 'Redo', exact: true }).click();

@@ -10,18 +10,24 @@ import type { SearchResult } from '../types';
 import { tagHighlight } from '../../shared/tags.mjs';
 import { ConnectionMarkers, markerId } from './ConnectionMarkers';
 import { cardSize, MIN_CARD_SIZE, EDIT_CARD_SIZE, MAX_CARD_SIZE } from '../lib/cardSize';
+import { routeConnections, type Port } from '../lib/connectorRouting';
+import { RoutedEdge } from './RoutedEdge';
 import '@xyflow/react/dist/style.css';
 type IdeaNode = Node<{ idea: Idea; dimmed: boolean; editing: boolean }, 'idea'>;
+const PortContext = createContext<Map<string, Port[]>>(new Map());
+const edgeTypes = { routed: RoutedEdge };
 const CardContext = createContext<Props | null>(null);
 function IdeaCard({ data, selected }: NodeProps<IdeaNode>) {
   const { idea, dimmed, editing } = data;
   const actions = useContext(CardContext)!;
   const updateInternals = useUpdateNodeInternals();
-  useEffect(() => { requestAnimationFrame(() => updateInternals(idea.id)); }, [editing, idea.id, idea.size?.width, idea.size?.height, updateInternals]);
+  const ports = useContext(PortContext).get(idea.id) || [];
+  const portSignature = ports.map(p => `${p.id}:${p.offset}`).join('|');
+  useEffect(() => { requestAnimationFrame(() => updateInternals(idea.id)); }, [editing, idea.id, idea.size?.width, idea.size?.height, portSignature, updateInternals]);
   const s = idea.style;
   const match = tagHighlight(actions.tagMatches[idea.id], actions.tagCutoff);
   const preview = idea.body.replace(/^#{1,6} [^\n]*\n+/, '');
-  return <div data-tag-match={match?.kind || undefined} data-tag-distance={match?.distance} className={`idea-card ${match?.kind === 'exact' ? 'tag-exact-match' : ''} ${editing ? 'is-editing' : ''} ${selected ? 'is-selected' : ''} ${dimmed && !match ? 'dimmed' : ''}`} style={{
+  return <><div data-tag-match={match?.kind || undefined} data-tag-distance={match?.distance} className={`idea-card ${match?.kind === 'exact' ? 'tag-exact-match' : ''} ${editing ? 'is-editing' : ''} ${selected ? 'is-selected' : ''} ${dimmed && !match ? 'dimmed' : ''}`} style={{
     background: match?.kind === 'semantic' ? match.color : s.background, borderColor: match?.kind === 'exact' ? '#26c65b' : s.borderColor, borderWidth: match?.kind === 'exact' ? Math.max(2, s.borderWidth) : s.borderWidth,
     borderStyle: s.borderStyle, borderRadius: s.radius, color: s.textColor,
     boxShadow: s.shadow ? '0 5px 16px -10px #233d3540, 0 2px 4px #233d3505' : 'none',
@@ -40,7 +46,9 @@ function IdeaCard({ data, selected }: NodeProps<IdeaNode>) {
     <div className="idea-preview"><Markdown body={preview || 'Every idea starts somewhere.'} assets={actions.workspace.assets} onNavigate={actions.onNavigate} /></div>
     <div className="idea-footer"><FileText size={11} /><span>{idea.body.trim() ? `${idea.body.trim().split(/\s+/).length} words` : 'Empty note'}</span><span className="idea-footer-line" /><span>{idea.history.length} {idea.history.length === 1 ? 'version' : 'versions'}</span></div>
     </>}
-  </div>;
+  </div>{ports.map(port => <Handle key={port.id} id={port.id} type="source" className="routed-port" isConnectable={false}
+    position={Position[port.side === 'left' ? 'Left' : port.side === 'right' ? 'Right' : port.side === 'top' ? 'Top' : 'Bottom']}
+    style={port.side === 'top' || port.side === 'bottom' ? { left: port.offset, [port.side]: 0 } : { top: port.offset, [port.side]: 0 }} />)}</>;
 }
 const nodeTypes = { idea: IdeaCard };
 interface Props {
@@ -88,37 +96,46 @@ export function MapCanvas(props: Props) {
       return { ...node, measured: old?.measured, ...(old?.resizing ? { width: old.width, height: old.height, position: old.position, resizing: true } : {}) };
     });
   }), [initialNodes, setNodes]);
-  const edges = useMemo<Edge[]>(() => workspace.edges.map(edge => {
-    const source = workspace.nodes.find(n => n.id === edge.source)!;
-    const target = workspace.nodes.find(n => n.id === edge.target)!;
-    const dx = target.position.x - source.position.x, dy = target.position.y - source.position.y;
-    const vertical = Math.abs(dy) > Math.abs(dx) * 0.8;
-    return { id: edge.id, source: edge.source, target: edge.target,
-      sourceHandle: edge.sourceHandle || (vertical ? (dy > 0 ? 'bottom' : 'top') : (dx > 0 ? 'right' : 'left')),
-      targetHandle: edge.targetHandle || (vertical ? (dy > 0 ? 'top' : 'bottom') : (dx > 0 ? 'left' : 'right')),
-      reconnectable: true,
-      selected: selectedEdge === edge.id,
-      type: edge.style.path === 'bezier' ? 'default' : edge.style.path === 'angular' ? 'smoothstep' : 'straight',
-      pathOptions: { borderRadius: 0 },
+  // Local React Flow bounds include in-progress drags, resizes, and expanded editors.
+  const routes = useMemo(() => routeConnections(nodes.map(node => ({ id: node.id, ...node.position,
+    width: node.width || 240, height: node.height || 160, radius: node.data.idea.style.radius })), workspace.edges), [nodes, workspace.edges]);
+  const ports = useMemo(() => {
+    const result = new Map<string, Port[]>();
+    for (const route of routes.values()) for (const port of [route.source, route.target]) {
+      const group = result.get(port.nodeId) || []; group.push(port); result.set(port.nodeId, group);
+    }
+    return result;
+  }, [routes]);
+  const blocked = [...routes.entries()].filter(([, route]) => route.blocked);
+  const edges = useMemo<Edge[]>(() => workspace.edges.flatMap(edge => {
+    const route = routes.get(edge.id); if (!route) return [];
+    return [{ id: edge.id, source: edge.source, target: edge.target,
+      sourceHandle: route.source.id, targetHandle: route.target.id, reconnectable: true,
+      selected: selectedEdge === edge.id, type: 'routed', data: { route },
       style: { stroke: selectedEdge === edge.id ? '#375d49' : edge.style.color, strokeWidth: edge.style.width + (selectedEdge === edge.id ? 1 : 0),
         strokeDasharray: edge.style.line === 'dashed' ? '8 6' : edge.style.line === 'dotted' ? '2 5' : undefined },
       markerStart: edge.style.startTerminator !== 'none' ? markerId(edge.id, 'start') : undefined,
       markerEnd: edge.style.endTerminator !== 'none' ? markerId(edge.id, 'end') : undefined,
       interactionWidth: 24,
-    };
-  }), [workspace.edges, workspace.nodes, selectedEdge]);
-  return <CardContext.Provider value={props}><div className="canvas" data-testid="canvas">
+    }];
+  }), [workspace.edges, routes, selectedEdge]);
+  return <CardContext.Provider value={props}><PortContext.Provider value={ports}><div className="canvas" data-testid="canvas">
     <ConnectionMarkers edges={workspace.edges} />
-    <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={handleNodesChange}
+    <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} onNodesChange={handleNodesChange}
       onNodeClick={(_, node) => props.onSelect(node.id)} onNodeDoubleClick={(event, node) => props.onBeginEditing(node.id, (event.target as HTMLElement).closest('.idea-title') ? 'title' : 'body')}
       onEdgeClick={(_, edge) => props.onEdgeSelect(edge.id)}
       onNodeContextMenu={(event, node) => { event.preventDefault(); props.onContextMenu('node', node.id, event.clientX, event.clientY); }}
       onEdgeContextMenu={(event, edge) => { event.preventDefault(); props.onContextMenu('edge', edge.id, event.clientX, event.clientY); }}
       onPaneContextMenu={event => { event.preventDefault(); props.onContextMenu('canvas', null, event.clientX, event.clientY); }}
-      onReconnect={(edge, connection) => props.onReconnect(edge.id, connection)} reconnectRadius={14}
+      onReconnect={(edge, connection) => {
+        const saved = workspace.edges.find(e => e.id === edge.id)!;
+        props.onReconnect(edge.id, { ...connection,
+          sourceHandle: connection.sourceHandle?.startsWith('port:') ? saved.sourceHandle || null : connection.sourceHandle,
+          targetHandle: connection.targetHandle?.startsWith('port:') ? saved.targetHandle || null : connection.targetHandle });
+      }} reconnectRadius={14}
       onNodeDragStop={(_, node, moved) => props.onMoveMany(moved.length ? moved : [node])}
       onSelectionDragStop={(_, moved) => props.onMoveMany(moved)}
-      onConnect={props.onConnect} connectionMode={'loose' as import('@xyflow/react').ConnectionMode}
+      onConnect={connection => props.onConnect({ ...connection, sourceHandle: null, targetHandle: null })} connectionMode={'loose' as import('@xyflow/react').ConnectionMode}
       onInit={props.onInit} onMove={(_, viewport) => props.onZoom(viewport.zoom)}
       fitView fitViewOptions={{ padding: 0.18, maxZoom: 1 }} minZoom={0.15} maxZoom={2}
       deleteKeyCode={null} multiSelectionKeyCode={['Control', 'Meta']} selectionKeyCode="Shift" selectionMode={SelectionMode.Partial} panOnScroll selectionOnDrag={false} zoomOnDoubleClick={false}
@@ -127,8 +144,9 @@ export function MapCanvas(props: Props) {
       {props.minimap && <MiniMap nodeColor={node => (node.data as { idea: Idea }).idea.style.background} nodeStrokeColor="#a5b4a7" nodeBorderRadius={8} maskColor="#f4f6f080" pannable zoomable />}
     </ReactFlow>
     {!workspace.nodes.length && <div className="empty-canvas"><div className="empty-illustration"><Sprout size={42} strokeWidth={1.2} /></div><h2>Give an idea somewhere to grow.</h2><p>Start with one thought. See where it takes you.</p><button className="primary" onClick={() => props.onAdd()}><Plus size={16} />Create your first idea</button></div>}
+    {!!blocked.length && <div className="routing-notice" role="status">Separate nearby cards or change attachment sides to show {blocked.length} blocked {blocked.length === 1 ? 'connection' : 'connections'}. <button onClick={() => props.onEdgeSelect(blocked[0][0])}>Edit connection</button></div>}
     <div className="canvas-caption"><span className="live-dot" />A LITTLE SPACE FOR BIG IDEAS</div>
     <div className="canvas-controls"><button title="Zoom out" aria-label="Zoom out" onClick={props.onZoomOut}><Minus size={16} /></button><span>{Math.round(props.zoom * 100)}%</span><button title="Zoom in" aria-label="Zoom in" onClick={props.onZoomIn}><Plus size={16} /></button><i /><button title="Fit all ideas" aria-label="Fit all ideas" onClick={props.onFit}><Maximize size={16} /></button></div>
     <div className="canvas-hint">Drag selected card corners to resize <span>·</span> Ctrl/⌘ + click to multi-select <span>·</span> Shift + drag to select an area</div>
-  </div></CardContext.Provider>;
+  </div></PortContext.Provider></CardContext.Provider>;
 }

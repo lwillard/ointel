@@ -1,5 +1,7 @@
 # Ointel offline package for Apple Silicon
 
+Version 0.6.5 adds Automatic connector routing, separated attachment points, obstacle avoidance while moving or resizing cards, and double-line bridges at crossings.
+
 Download the **arm64 DMG** from this release, open it, and drag **Ointel.app** to Applications. Launch the installed app. The ZIP contains the same app for transfer or extraction without a disk image.
 
 No Node.js, npm install, dependency downloads, account, or model downloads are required on the destination Mac. The installer includes Electron, native Apple Silicon inference libraries, the vector-search model, English speech recognition, and speaker-separation models. You can transfer it to the Mac using an approved file-sharing method or removable drive.

@@ -1,3 +1,4 @@
+import { clickEdge } from './edge-gestures';
 import { test, expect, _electron as electron } from '@playwright/test';
 import path from 'node:path';
 import { mkdir, writeFile, readFile } from 'node:fs/promises';
@@ -12,6 +13,7 @@ async function launch(name: string) {
   await writeFile(path.join(directory, 'workspace.json'), JSON.stringify(workspace));
   const app = await electron.launch({ args: ['.'], env: { ...process.env, OINTEL_DATA_DIR: directory, OINTEL_MODEL_CACHE: path.resolve('.test-data/vectors/models'), OINTEL_TEST_MODE: '1' } });
   const page = await app.firstWindow();
+  await app.evaluate(({ BrowserWindow }) => { const win = BrowserWindow.getAllWindows()[0]; win.setOpacity(0); win.setSkipTaskbar(true); win.webContents.setBackgroundThrottling(false); win.showInactive(); });
   await expect(page.getByLabel('Map title')).toBeVisible();
   return { app, page, directory, workspace };
 }
@@ -80,7 +82,7 @@ test('context menus, branch deletion, reconnecting and connection terminators', 
   try {
     const edgeId = workspace.edges[0].id;
     const edge = page.locator(`.react-flow__edge[data-id="${edgeId}"]`);
-    await edge.locator('.react-flow__edge-interaction').click({ force: true });
+    await clickEdge(page, edge.locator('.react-flow__edge-path'));
     await page.getByLabel('Connection source', { exact: true }).selectOption('notes');
     await page.getByLabel('Connection target', { exact: true }).selectOption('reflect');
     await page.getByLabel('source attachment').selectOption('right');
@@ -93,7 +95,7 @@ test('context menus, branch deletion, reconnecting and connection terminators', 
     const updater = edge.locator('.react-flow__edgeupdater-target');
     await expect(updater).toBeAttached();
     const from = await updater.boundingBox();
-    const to = await page.locator('[data-id="ideas"] .react-flow__handle-left').boundingBox();
+    const to = await page.locator('[data-id="ideas"] .react-flow__handle[data-handleid="left"]').boundingBox();
     if (!from || !to) throw new Error('Reconnect handles unavailable');
     await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
     await page.mouse.down();

@@ -1,3 +1,4 @@
+import { clickEdge } from './edge-gestures';
 import { test, expect, _electron as electron } from '@playwright/test';
 import path from 'node:path';
 import { mkdir, readFile } from 'node:fs/promises';
@@ -7,6 +8,7 @@ test('desktop workflow, semantic retrieval, and durable Markdown history', async
   await mkdir(directory, { recursive: true });
   const app = await electron.launch({ args: ['.'], env: { ...process.env, OINTEL_DATA_DIR: directory, OINTEL_MODEL_CACHE: path.resolve('.test-data/vectors/models'), OINTEL_TEST_MODE: '1' } });
   const page = await app.firstWindow();
+  await app.evaluate(({ BrowserWindow }) => { const win = BrowserWindow.getAllWindows()[0]; win.setOpacity(0); win.setSkipTaskbar(true); win.webContents.setBackgroundThrottling(false); win.showInactive(); });
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   try {
@@ -15,7 +17,7 @@ test('desktop workflow, semantic retrieval, and durable Markdown history', async
     await expect(page.locator('.react-flow__edge-path')).toHaveCount(5);
     await expect(page.locator('.inspector .markdown h1')).toHaveText('A more connected mind');
     await page.screenshot({ path: 'artifacts/ointel-desktop.png' });
-    await page.locator('.react-flow__edge-interaction').first().click({ force: true });
+    await clickEdge(page, page.locator('.react-flow__edge-path').first());
     await expect(page.locator('.edge-intro')).toContainText('A thread between ideas');
     await page.getByLabel('Path', { exact: true }).selectOption('angular');
     await page.getByLabel('Line style', { exact: true }).selectOption('dashed');

@@ -17,7 +17,7 @@ export const nodeStyleSchema = z.object({
   fontSize: z.number().min(12).max(28), bold: z.boolean(), italic: z.boolean(),
 });
 export const edgeStyleSchema = z.object({
-  color, width: z.number().min(1).max(8), path: z.enum(['bezier', 'angular', 'straight']),
+  color, width: z.number().min(1).max(8), path: z.enum(['automatic', 'bezier', 'angular', 'straight']).default('automatic'),
   line: z.enum(['solid', 'dashed', 'dotted']), arrow: z.boolean().default(false),
   startTerminator: terminator.default('none'), endTerminator: terminator.optional(),
 }).transform(style => ({ ...style, endTerminator: style.endTerminator ?? (style.arrow ? 'solid-arrow' : 'none') }));
