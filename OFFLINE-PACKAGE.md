@@ -1,6 +1,6 @@
 # Ointel offline package for Apple Silicon
 
-Version 0.6.7 adds title-only collapse/expand controls and matching flat type icons, including a question mark for untyped cards. Expanded sizes and notes are preserved, collapse state is saved, and connectors adapt to compact cards. Flowing Bézier routing and crossing bridges remain included.
+Version 0.6.8 replaces filtered type suggestions with a complete dropdown containing every predefined icon type and alias, plus No type. Both the inspector and inline editor retain custom type entry.
 
 Download the **arm64 DMG** from this release, open it, and drag **Ointel.app** to Applications. Launch the installed app. The ZIP contains the same app for transfer or extraction without a disk image.
 

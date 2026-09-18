@@ -23,6 +23,10 @@ test('collapse cards, restore sizes, show equal type icons, and save empty types
       await expect(icon).toHaveAttribute('width', '24'); await expect(icon).toHaveAttribute('height', '24');
       await expect(icon.locator('..')).toHaveAttribute('data-card-type-icon', kind);
     }
+    const choices = ['No type', 'Person', 'Idea', 'Task', 'Project', 'Program', 'Question', 'Note', 'Decision', 'Goal', 'Meeting', 'Event', 'Resource', 'Risk', 'Custom', 'People', 'Speaker', 'Contact', 'Programme', 'Action', 'Document', 'Milestone', 'Link'];
+    await expect(page.getByLabel('Card type options', { exact: true }).locator('option')).toHaveText(choices);
+    await page.getByLabel('Card type options', { exact: true }).selectOption('Speaker');
+    await expect(root.locator('.card-type-icon')).toHaveAttribute('data-card-type-icon', 'person');
     const oldPaths = await paths();
     await root.getByRole('button', { name: 'Collapse card', exact: true }).click();
     await expect.poll(dimensions).toEqual({ width: 340, height: 64 });
@@ -49,6 +53,10 @@ test('collapse cards, restore sizes, show equal type icons, and save empty types
     await root.locator('.idea-title').dblclick();
     await expect(page.getByRole('textbox', { name: 'Card note' })).toBeVisible();
     await expect(root.getByRole('img', { name: 'No type', exact: true })).toBeVisible();
+    await expect(page.getByLabel('Inline card type options', { exact: true }).locator('option')).toHaveText(choices);
+    await page.getByLabel('Inline card type options', { exact: true }).selectOption('Program');
+    await expect(root.locator('.card-type-icon')).toHaveAttribute('data-card-type-icon', 'program');
+    await page.getByLabel('Inline card type options', { exact: true }).selectOption('');
     await page.getByRole('textbox', { name: 'Card note' }).fill('Edited before collapsing.');
     await root.getByRole('button', { name: 'Collapse card', exact: true }).click();
     await expect(page.getByRole('textbox', { name: 'Card note' })).toHaveCount(0);

@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react';
 
-export const cardTypes = ['Person', 'Idea', 'Task', 'Project', 'Program', 'Question', 'Note', 'Decision', 'Goal', 'Meeting', 'Event', 'Resource', 'Risk'];
 const aliases: Record<string, string> = { people: 'person', speaker: 'person', contact: 'person', programme: 'program', action: 'task', document: 'note', milestone: 'goal', link: 'resource' };
 const icons: Record<string, ReactNode> = {
   person: <><circle cx="12" cy="7.5" r="3.5" /><path d="M5 20v-2a7 7 0 0 1 14 0v2Z" opacity=".55" /></>,
@@ -18,6 +17,9 @@ const icons: Record<string, ReactNode> = {
   risk: <><path d="M10.3 3a2 2 0 0 1 3.4 0l9 16a2 2 0 0 1-1.7 3H3a2 2 0 0 1-1.7-3Z" opacity=".25" /><path d="M12 8v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /><circle cx="12" cy="18" r="1.2" /></>,
   custom: <><rect x="3" y="3" width="18" height="18" rx="5" opacity=".25" /><path d="m12 6 6 6-6 6-6-6Z" opacity=".7" /></>,
 };
+
+// Derive the choices from the icon registry so every supported type stays listed.
+export const cardTypes = [...Object.keys(icons), ...Object.keys(aliases)].map(type => type[0].toUpperCase() + type.slice(1));
 
 export function CardTypeIcon({ type }: { type?: string }) {
   const label = type?.trim() || '', key = label.toLowerCase();

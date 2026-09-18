@@ -32,7 +32,7 @@ npm run test:e2e      # Full desktop workflow; requires the built renderer
 ## Working with the map
 
 - Use the mini chevron in a card’s top-right corner to collapse it to its title and type icon, or expand it again. The expanded size is preserved; collapse state autosaves, supports undo/redo, and travels with exports and duplicates. Double-click a collapsed title to edit temporarily in an expanded card. Connectors and layouts use the visible card dimensions.
-- Flat type icons sit beside the title in both states and during editing. Person, Idea, Task, Project, Program, Question, Note, Decision, Goal, Meeting, Event, Resource, and Risk have matching 24-pixel icons that inherit the card color. The Type field suggests these types and still accepts custom names. Clear the field for a question-mark icon; custom types use a generic symbol.
+- Flat type icons sit beside the title in both states and during editing. Person, Idea, Task, Project, Program, Question, Note, Decision, Goal, Meeting, Event, Resource, and Risk have matching 24-pixel icons that inherit the card color. The Type dropdown always lists every predefined icon type, including aliases such as Speaker, Contact, Action, Document, and Milestone, plus No type. The adjacent text field still accepts custom names. Clear the field for a question-mark icon; custom types use a generic symbol.
 
 - Select a card and drag a corner to resize it. Pinned cards expose only the bottom-right corner, keeping their position fixed. Sizes autosave, survive export/import and duplication, and support undo/redo. Layouts account for each card's dimensions. Small cards temporarily expand for editing; resizing while editing saves the new dimensions.
 
