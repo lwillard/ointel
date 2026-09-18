@@ -1,6 +1,6 @@
 # Ointel offline package for Apple Silicon
 
-Version 0.6.5 adds Automatic connector routing, separated attachment points, obstacle avoidance while moving or resizing cards, and double-line bridges at crossings.
+Version 0.6.6 restores flowing Bézier connectors. Clear connections keep the original curve; blocked connections gain smooth waypoints around cards. Automatic routing, separated attachment points, live obstacle avoidance, and double-line crossing bridges remain included.
 
 Download the **arm64 DMG** from this release, open it, and drag **Ointel.app** to Applications. Launch the installed app. The ZIP contains the same app for transfer or extraction without a disk image.
 

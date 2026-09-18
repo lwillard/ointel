@@ -43,6 +43,8 @@ test('routes around cards live, spreads ports, bridges crossings, and preserves 
     await expect(line).toBeAttached(); await expect(page.locator('.connector-bridge').first()).toBeAttached();
     await page.getByRole('button', { name: 'Fit all ideas', exact: true }).click(); await page.waitForTimeout(500);
     await assertNoUnderpasses();
+    await expect(line).toHaveAttribute('d', /C /);
+    await expect(line).not.toHaveAttribute('d', /[LQHV]/);
     const offsets = await page.locator('[data-id="left"] .routed-port').evaluateAll(els => els.map(el => parseFloat((el as HTMLElement).style.top)).sort((a, b) => a - b));
     expect(offsets).toHaveLength(3); expect(offsets[1] - offsets[0]).toBeGreaterThanOrEqual(21); expect(offsets[2] - offsets[1]).toBeGreaterThanOrEqual(21);
     await selectEdge(); await expect(page.getByLabel('Path', { exact: true })).toHaveValue('automatic');

@@ -151,18 +151,98 @@ function orthogonalRoute(start: Point, end: Point, obstacles: CardBounds[]): Poi
   return null;
 }
 
-function rounded(points: Point[], radius: number, obstacles: CardBounds[]): Point[] {
-  const result: Point[] = [points[0]];
-  for (let i = 1; i < points.length - 1; i++) {
-    const a = points[i - 1], b = points[i], c = points[i + 1], before = distance(a, b), after = distance(b, c);
-    const r = Math.min(radius, before / 3, after / 3);
-    const from = add(b, { x: (a.x - b.x) / before, y: (a.y - b.y) / before }, r);
-    const to = add(b, { x: (c.x - b.x) / after, y: (c.y - b.y) / after }, r);
-    const curve = [from];
-    for (let step = 1; step <= 10; step++) { const t = step / 10, u = 1 - t; curve.push({ x: u * u * from.x + 2 * u * t * b.x + t * t * to.x, y: u * u * from.y + 2 * u * t * b.y + t * t * to.y }); }
-    result.push(...(pathClear(curve, obstacles) ? curve : [b]));
+/** Diagonal visibility routing supplies a few obstacle-corner knots for flowing curves. */
+function visibilityRoute(start: Point, end: Point, obstacles: CardBounds[]): Point[] | null {
+  if (clear(start, end, obstacles)) return [start, end];
+  const inside = (p: Point) => obstacles.some(r => p.x > r.x + EPS && p.x < r.x + r.width - EPS && p.y > r.y + EPS && p.y < r.y + r.height - EPS);
+  if (inside(start) || inside(end)) return null;
+  const points = [start, end, ...obstacles.flatMap(r => [
+    { x: r.x, y: r.y }, { x: r.x + r.width, y: r.y },
+    { x: r.x, y: r.y + r.height }, { x: r.x + r.width, y: r.y + r.height },
+  ]).filter(p => !inside(p))];
+  const best = new Map<number, number>([[0, 0]]), parents = new Map<number, number>(), heap = new MinHeap();
+  heap.push({ key: 0, cost: 0, rank: distance(start, end) });
+  while (heap.items.length) {
+    const current = heap.pop(); if (best.get(current.key) !== current.cost) continue;
+    if (current.key === 1) {
+      const route: Point[] = []; let key: number | undefined = 1;
+      while (key !== undefined) { route.push(points[key]); key = parents.get(key); }
+      return simplify(route.reverse());
+    }
+    for (let i = 1; i < points.length; i++) {
+      const cost = current.cost + distance(points[current.key], points[i]);
+      if (cost >= (best.get(i) ?? Infinity) || !clear(points[current.key], points[i], obstacles)) continue;
+      best.set(i, cost); parents.set(i, current.key); heap.push({ key: i, cost, rank: cost + distance(points[i], end) });
+    }
   }
-  result.push(points.at(-1)!); return simplify(result);
+  return null;
+}
+
+type Cubic = [Point, Point, Point, Point];
+const midpoint = (a: Point, b: Point): Point => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+function splitCubic([a, b, c, d]: Cubic): [Cubic, Cubic] {
+  const ab = midpoint(a, b), bc = midpoint(b, c), cd = midpoint(c, d), abc = midpoint(ab, bc), bcd = midpoint(bc, cd), m = midpoint(abc, bcd);
+  return [[a, ab, abc, m], [m, bcd, cd, d]];
+}
+
+// A cubic stays inside its control hull. Subdivide ambiguous hulls rather than
+// trusting sparse samples, which can miss a curve clipping a card's corner.
+function cubicHitsCard(curve: Cubic, r: CardBounds, depth = 0): boolean {
+  const xs = curve.map(p => p.x), ys = curve.map(p => p.y);
+  if (Math.max(...xs) <= r.x + EPS || Math.min(...xs) >= r.x + r.width - EPS ||
+      Math.max(...ys) <= r.y + EPS || Math.min(...ys) >= r.y + r.height - EPS) return false;
+  if (depth === 12) return true;
+  if (curve.every(p => p.x > r.x && p.x < r.x + r.width && p.y > r.y && p.y < r.y + r.height)) return true;
+  const [left, right] = splitCubic(curve);
+  return cubicHitsCard(left, r, depth + 1) || cubicHitsCard(right, r, depth + 1);
+}
+const cubicClear = (curve: Cubic, obstacles: CardBounds[]) => obstacles.every(r => !cubicHitsCard(curve, r));
+
+function flattenCubic(curve: Cubic, depth = 0): Point[] {
+  const [a, b, c, d] = curve, chord = distance(a, d);
+  const deviation = (p: Point) => chord < EPS ? distance(a, p) : Math.abs((d.x - a.x) * (a.y - p.y) - (a.x - p.x) * (d.y - a.y)) / chord;
+  if (depth === 12 || (Math.max(deviation(b), deviation(c)) < 0.15 && distance(a, b) + distance(b, c) + distance(c, d) - chord < 0.15)) return [a, d];
+  const [left, right] = splitCubic(curve);
+  return [...flattenCubic(left, depth + 1).slice(0, -1), ...flattenCubic(right, depth + 1)];
+}
+function cubicGeometry(curves: Cubic[]): { points: Point[]; path: string } {
+  const xy = (p: Point) => `${number(p.x)} ${number(p.y)}`;
+  return { points: curves.flatMap((curve, i) => flattenCubic(curve).slice(i ? 1 : 0)),
+    path: `M ${xy(curves[0][0])} ` + curves.map(([, b, c, d]) => `C ${xy(b)} ${xy(c)} ${xy(d)}`).join(' ') };
+}
+
+function originalBezier(source: Port, target: Port): Cubic {
+  const control = (port: Port, other: Port) => {
+    const n = normal[port.side], delta = (other.point.x - port.point.x) * n.x + (other.point.y - port.point.y) * n.y;
+    // Match React Flow's original default curvature (0.25).
+    return add(port.point, n, delta >= 0 ? delta / 2 : 25 * Math.sqrt(-delta));
+  };
+  return [source.point, control(source, target), control(target, source), target.point];
+}
+
+/** Use the old single cubic when clear; add smooth waypoints only for obstacles. */
+function flowingBezier(guide: Point[], source: Port, target: Port, obstacles: CardBounds[], guideObstacles: CardBounds[]) {
+  // Remove grid corners that have line of sight. These remaining knots guide a
+  // continuous curve, not an orthogonal line with small rounded elbows.
+  const knots = [guide[0]];
+  for (let i = 0; i < guide.length - 1;) {
+    let next = guide.length - 1;
+    while (next > i + 1 && !clear(guide[i], guide[next], guideObstacles)) next--;
+    knots.push(guide[next]); i = next;
+  }
+  const unit = (a: Point, b: Point): Point => { const len = distance(a, b) || 1; return { x: (b.x - a.x) / len, y: (b.y - a.y) / len }; };
+  const tangents = knots.map((_, i) => i === 0 ? normal[source.side] : i === knots.length - 1 ? add({ x: 0, y: 0 }, normal[target.side], -1) : unit(knots[i - 1], knots[i + 1]));
+  const curves: Cubic[] = [];
+  for (let i = 1; i < knots.length; i++) {
+    const a = knots[i - 1], d = knots[i], length = distance(a, d);
+    const before = i > 1 ? Math.min(length, distance(knots[i - 2], a)) : length;
+    const after = i < knots.length - 1 ? Math.min(length, distance(d, knots[i + 1])) : length;
+    for (const tension of [0.4, 0.28, 0.16, 0.08, 0]) {
+      const curve: Cubic = [a, add(a, tangents[i - 1], before * tension), add(d, tangents[i], -after * tension), d];
+      if (cubicClear(curve, obstacles) || tension === 0) { curves.push(curve); break; }
+    }
+  }
+  return cubicGeometry(curves);
 }
 const number = (n: number) => +n.toFixed(3);
 export const svgPath = (points: Point[]) => points.map((p, i) => `${i ? 'L' : 'M'} ${number(p.x)} ${number(p.y)}`).join(' ');
@@ -231,18 +311,26 @@ export function routeConnections(cards: CardBounds[], edges: Connector[]): Map<s
   for (const edge of edges) {
     const pair = ports.get(edge.id); if (!pair) continue;
     const { source, target } = pair;
-    let middle: Point[] | null = null;
+    const curved = edge.style.path === 'automatic' || edge.style.path === 'bezier';
+    const curveObstacles = cards.map(r => r.id === source.nodeId || r.id === target.nodeId ? r : inflate(r, 7));
+    const direct = originalBezier(source, target);
+    if (curved && cubicClear(direct, curveObstacles)) {
+      routes.set(edge.id, { ...pair, ...cubicGeometry([direct]), bridges: [], gaps: [], width: edge.style.width + 1, blocked: false });
+      continue;
+    }
+    let middle: Point[] | null = null, usedClearance = CLEARANCE;
     // Prefer breathing room, but use a narrower safe corridor when cards are close.
     for (const clearance of [CLEARANCE, 12, 6]) {
       const obstacles = cards.map(r => inflate(r, clearance));
       const start = add(source.point, normal[source.side], clearance), end = add(target.point, normal[target.side], clearance);
       const stemsClear = clear(source.point, start, inkObstacles.filter(r => r.id !== source.nodeId)) && clear(end, target.point, inkObstacles.filter(r => r.id !== target.nodeId));
-      middle = stemsClear ? (edge.style.path === 'straight' && clear(start, end, obstacles) ? [start, end] : orthogonalRoute(start, end, obstacles)) : null;
+      usedClearance = clearance;
+      middle = stemsClear ? curved ? visibilityRoute(start, end, obstacles) : (edge.style.path === 'straight' && clear(start, end, obstacles) ? [start, end] : orthogonalRoute(start, end, obstacles)) : null;
       if (middle) break;
     }
     const points = middle ? simplify([source.point, ...middle, target.point]) : [];
-    const smoothed = points.length && (edge.style.path === 'automatic' || edge.style.path === 'bezier') ? rounded(points, edge.style.path === 'bezier' ? 24 : 14, inkObstacles) : points;
-    routes.set(edge.id, { ...pair, points: smoothed, path: svgPath(smoothed), bridges: [], gaps: [], width: edge.style.width + 1, blocked: !middle });
+    const geometry = points.length && curved ? flowingBezier(points, source, target, curveObstacles, cards.map(r => r.id === source.nodeId || r.id === target.nodeId ? r : inflate(r, usedClearance))) : { points, path: svgPath(points) };
+    routes.set(edge.id, { ...pair, ...geometry, bridges: [], gaps: [], width: edge.style.width + 1, blocked: !middle });
   }
   addBridges(routes, cards); return routes;
 }

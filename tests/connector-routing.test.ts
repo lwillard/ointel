@@ -23,6 +23,21 @@ describe('automatic connector routing', () => {
     delete (workspace.edges[0].style as Partial<EdgeStyle>).path;
     expect(parseWorkspace(workspace).edges[0].style.path).toBe('automatic');
   });
+  for (const path of ['automatic', 'bezier'] as const) {
+    it(`${path} preserves the original cubic when no obstacle is in the way`, () => {
+      const cards = [card('a', 0, 0), card('b', 600, 240)];
+      const route = assertClear(cards, [edge('ab', 'a', 'b', { sourceHandle: 'right', targetHandle: 'left', style: { ...defaultEdgeStyle, path } })]).get('ab')!;
+      expect(route.path).toBe('M 240 136 C 420 136 420 264 600 264');
+      expect(route.points.length).toBeGreaterThan(10);
+    });
+    it(`${path} adds cubic waypoints around a blocker rather than orthogonal elbows`, () => {
+      const cards = [card('a', 0, 200), card('b', 850, 200), card('blocker', 400, 150, 300, 260)];
+      const route = assertClear(cards, [edge('ab', 'a', 'b', { sourceHandle: 'right', targetHandle: 'left', style: { ...defaultEdgeStyle, path } })]).get('ab')!;
+      expect(route.path.match(/C /g)!.length).toBeGreaterThan(1);
+      expect(route.path).not.toMatch(/[LQHV]/);
+      expect(route.points.some((p, i) => i && Math.abs(p.x - route.points[i - 1].x) > 1 && Math.abs(p.y - route.points[i - 1].y) > 1)).toBe(true);
+    });
+  }
   it('repels both incoming and outgoing ports on a face, compressing only when crowded', () => {
     const cards = [card('hub', 0, 0), ...Array.from({ length: 30 }, (_, i) => card(`n${i}`, 700, 0))];
     const edges = cards.slice(1).map((n, i) => i % 2 ? edge(`e${i}`, n.id, 'hub', { targetHandle: 'right' }) : edge(`e${i}`, 'hub', n.id, { sourceHandle: 'right' }));
@@ -68,7 +83,9 @@ describe('automatic connector routing', () => {
   it('uses a narrow safe corridor when the preferred clearance does not fit', () => {
     const cards = [card('a', 0, 0), card('b', 260, 0)];
     const route = assertClear(cards, [edge('ab', 'a', 'b', { sourceHandle: 'right', targetHandle: 'left' })]).get('ab')!;
-    expect(route.path).toBe('M 240 80 L 260 80');
+    expect(route.points[0]).toEqual({ x: 240, y: 80 });
+    expect(route.points.at(-1)).toEqual({ x: 260, y: 80 });
+    expect(route.points.every(p => p.y === 80)).toBe(true);
   });
   it('merges nearby crossings into one overpass and clears the whole arch underneath', () => {
     const cards = [card('left', 0, 350), card('right', 900, 350), card('top', 450, 0), card('bottom', 450, 750)];
