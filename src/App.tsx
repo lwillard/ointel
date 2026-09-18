@@ -245,6 +245,11 @@ export default function App() {
     commit(w => applyCardTheme(w, selectedIds, theme.style));
     notify(`${theme.name} applied to ${selectedIds.length} selected ${selectedIds.length === 1 ? 'card' : 'cards'}.`);
   }
+  function collapseCard(id: string, collapsed: boolean) {
+    if (editingId === id) finishEditing();
+    commit(w => w.nodes.some(n => n.id === id && !!n.collapsed !== collapsed)
+      ? { ...w, nodes: w.nodes.map(n => n.id === id ? { ...n, collapsed } : n) } : w);
+  }
   function resizeCard(id: string, bounds: { x: number; y: number; width: number; height: number }) {
     commit(w => ({ ...w, nodes: w.nodes.map(node => node.id === id ? {
       ...node, size: { width: bounds.width, height: bounds.height },
@@ -305,9 +310,12 @@ export default function App() {
     finally { editor.off('transaction', mapSelection); }
   }
   const navigationRequest = useRef(0);
+  const detailsFitTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(detailsFitTimer.current), []);
   const navigate = useCallback((id: string) => {
     const node = current.current?.nodes.find(n => n.id === id);
     if (!node) return notify('This linked idea no longer exists.');
+    clearTimeout(detailsFitTimer.current);
     const request = ++navigationRequest.current;
     setEditingId(null); setActiveEditor(null); setFilter(''); select(id);
     // Let the editor collapse and the details panel open before centering the
@@ -383,7 +391,7 @@ export default function App() {
       { label: 'Edit card', action: () => beginEditing(node.id) },
       { label: 'Add child node', action: () => addIdea(node.id) },
       { label: 'Duplicate node', action: () => {
-        const copy = { ...makeIdea(`${node.title} (copy)`.slice(0, 160), { x: node.position.x + 50, y: node.position.y + cardSize(node).height + 30 }, node.body), cardType: node.cardType, tags: [...node.tags], style: { ...node.style }, ...(node.size ? { size: { ...node.size } } : {}) };
+        const copy = { ...makeIdea(`${node.title} (copy)`.slice(0, 160), { x: node.position.x + 50, y: node.position.y + cardSize(node).height + 30 }, node.body), collapsed: node.collapsed, cardType: node.cardType, tags: [...node.tags], style: { ...node.style }, ...(node.size ? { size: { ...node.size } } : {}) };
         copy.history = [{ id: uid(), title: copy.title, body: copy.body, tags: [...copy.tags], cardType: copy.cardType, savedAt: now() }];
         commit(w => ({ ...w, nodes: [...w.nodes, copy] })); select(copy.id);
       } },
@@ -483,7 +491,7 @@ export default function App() {
     <main className="main"><header className="topbar"><div><div className="breadcrumb">Personal workspace<ChevronRight size={12} /><span>Mind map</span></div><input className="map-title" aria-label="Map title" value={workspace.title} maxLength={160} onChange={e => { const title = e.target.value; if (title) commit(w => ({ ...w, title }), 'map-title'); }} /></div><div className="topbar-actions"><span className={`save-indicator ${saveStatus}`} title={saveStatus === 'saved' ? 'All changes saved locally' : undefined}>{saveStatus === 'saved' ? <CheckCheck size={14} /> : saveStatus === 'saving' ? <LoaderCircle size={14} className="spin" /> : <AlertCircle size={14} />}{saveStatus === 'saved' ? 'All changes saved' : saveStatus === 'saving' ? 'Saving…' : 'Save failed'}</span><button className="icon-button import-button" title="Import map" aria-label="Import map" onClick={() => fileInput.current?.click()}><Upload size={17} /></button><button className="secondary export-button" onClick={exportMap}><Download size={15} />Export</button><span className="profile-avatar">O</span></div></header>
       <div className="map-toolbar"><div className="toolbar-left"><div className="view-label"><Waypoints size={17} /><span>Canvas</span></div><span className="toolbar-divider" /><div className="arrange-control"><button className="toolbar-button" onClick={() => autoArrange()}><GitBranch size={15} />Auto-arrange</button><button className="arrange-chevron" aria-label="Choose arrangement" title="Choose arrangement" onClick={() => setLayoutMenu(!layoutMenu)}><ChevronDown size={13} /></button>{layoutMenu && <><div className="popover-dismiss" onClick={() => setLayoutMenu(false)} /><div className="layout-menu"><span>MAKE ROOM FOR CONNECTIONS</span>{([{ key: 'hierarchy', title: 'Hierarchy', detail: 'A clear, left-to-right flow', icon: GitBranch }, { key: 'radial', title: 'Radial', detail: 'Ideas around a central thought', icon: CircleDot }, { key: 'force', title: 'Force-directed', detail: 'Let connections find their balance', icon: Waypoints }] as const).map(item => <button key={item.key} onClick={() => autoArrange(item.key)}><item.icon size={18} /><div><strong>{item.title}</strong><small>{item.detail}</small></div>{layout === item.key && <Check size={15} />}</button>)}<p><Pin size={12} />Pinned ideas stay in place.</p></div></>}</div>
         <button className={`toolbar-button pin-toolbar ${selectionLocked ? 'active' : ''}`} disabled={!selectedCards.length} onClick={() => commit(w => ({ ...w, nodes: w.nodes.map(node => selectedIds.includes(node.id) ? { ...node, locked: !selectionLocked } : node) }))}><Pin size={14} /><span>{selectedCards.length > 1 ? (selectionLocked ? 'Unpin selected' : 'Pin selected') : (selectionLocked ? 'Unpin' : 'Pin position')}</span></button></div>
-        <div className="toolbar-right"><button className="icon-button" title="Undo (Ctrl+Z)" aria-label="Undo" disabled={!undoCount} onClick={undo}><Undo2 size={16} /></button><button className="icon-button" title="Redo (Ctrl+Shift+Z)" aria-label="Redo" disabled={!redoCount} onClick={redo}><Redo2 size={16} /></button><span className="toolbar-divider" /><button className={`icon-button minimap-button ${minimap ? 'active' : ''}`} title="Toggle minimap" aria-label="Toggle minimap" onClick={() => setMinimap(!minimap)}><LayoutGrid size={16} /></button><button className="icon-button" title="Toggle details" aria-label="Toggle details" onClick={() => { setPanelOpen(!panelOpen); setTimeout(fit, 100); }}>{panelOpen ? <PanelRightClose size={17} /> : <PanelRightOpen size={17} />}</button><button className="primary add-node" onClick={() => addIdea()}><Plus size={16} /><span>Add idea</span></button></div>
+        <div className="toolbar-right"><button className="icon-button" title="Undo (Ctrl+Z)" aria-label="Undo" disabled={!undoCount} onClick={undo}><Undo2 size={16} /></button><button className="icon-button" title="Redo (Ctrl+Shift+Z)" aria-label="Redo" disabled={!redoCount} onClick={redo}><Redo2 size={16} /></button><span className="toolbar-divider" /><button className={`icon-button minimap-button ${minimap ? 'active' : ''}`} title="Toggle minimap" aria-label="Toggle minimap" onClick={() => setMinimap(!minimap)}><LayoutGrid size={16} /></button><button className="icon-button" title="Toggle details" aria-label="Toggle details" onClick={() => { setPanelOpen(!panelOpen); clearTimeout(detailsFitTimer.current); detailsFitTimer.current = setTimeout(fit, 100); }}>{panelOpen ? <PanelRightClose size={17} /> : <PanelRightOpen size={17} />}</button><button className="primary add-node" onClick={() => addIdea()}><Plus size={16} /><span>Add idea</span></button></div>
       </div>
         <ThemesToolbar themes={themes} selected={selectedCards} total={workspace.nodes.length} onApply={applyTheme} onEdit={() => setModal('themes')} onSelectAll={selectAllCards} onClear={clearCardSelection} />
         <FormattingToolbar active={activeEditor} nodes={workspace.nodes} onImage={insertCardImage} />
@@ -498,7 +506,7 @@ export default function App() {
         editingId={editingId} editingFocus={editingFocus} onBeginEditing={beginEditing} onFinishEditing={finishEditing}
         onActiveEditor={setActiveEditor} onEdit={editCard} onSaveVersion={saveCardVersion} onImage={insertCardImage} onNavigate={navigate}
         onSelect={focusCard} onEdgeSelect={id => { finishEditing(); setSelectedIds([]); setSelected(null); setSelectedEdge(id); setPanelOpen(true); }}
-        onMoveMany={moveCards} onResize={resizeCard}
+        onMoveMany={moveCards} onResize={resizeCard} onCollapse={collapseCard}
         onConnect={connect} onInit={instance => { flow.current = instance; }} onZoom={setZoom}
         onAdd={position => addIdea(undefined, position)} onFit={fit} onZoomIn={() => void flow.current?.zoomIn({ duration: 200 })} onZoomOut={() => void flow.current?.zoomOut({ duration: 200 })} minimap={minimap} />
         {panelOpen && selectedCards.length > 1 && !selectedEdge && <SelectionInspector cards={selectedCards} onChange={styleNode} onEditTheme={() => setModal('themes')} onDelete={deleteSelection} onClose={() => setPanelOpen(false)} />}

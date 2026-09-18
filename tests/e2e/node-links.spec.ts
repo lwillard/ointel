@@ -6,6 +6,7 @@ test('native copy/paste inserts a titled node link at the caret, preserves text 
   const directory = path.resolve(`.test-data/node-links-${Date.now()}`);
   const app = await electron.launch({ args: ['.'], env: { ...process.env, OINTEL_DATA_DIR: directory, OINTEL_MODEL_CACHE: path.resolve('.test-data/vectors/models'), OINTEL_TEST_MODE: '1' } });
   const page = await app.firstWindow();
+  await app.evaluate(({ BrowserWindow }) => { const win = BrowserWindow.getAllWindows()[0]; win.setOpacity(0); win.setSkipTaskbar(true); win.webContents.setBackgroundThrottling(false); win.showInactive(); });
   const mod = process.platform === 'darwin' ? 'Meta' : 'Control';
   const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
   async function expectFocusedCard(id: string) {
@@ -39,7 +40,8 @@ test('native copy/paste inserts a titled node link at the caret, preserves text 
     // Undo/redo paste stays inside the note editor.
     await note.press(`${mod}+z`); await expect(note).toHaveText('Before after');
     await note.press(`${mod}+Shift+z`); await expect(note.getByRole('link', { name: title, exact: true })).toBeVisible();
-    await note.press(process.platform === 'darwin' ? 'Meta+ArrowUp' : 'Control+Home'); for (let i = 0; i < 6; i++) await note.press('Shift+ArrowRight');
+    await note.press(process.platform === 'darwin' ? 'Meta+ArrowUp' : 'Control+Home'); for (let i = 0; i < 6; i++) await note.press('Shift+ArrowRight', { delay: 30 });
+    await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe('Before');
     await note.press(`${mod}+c`);
     await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('Before');
     // A normal click follows the link even inside the live editor. Opening the

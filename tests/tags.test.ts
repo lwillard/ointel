@@ -13,7 +13,7 @@ describe('tags and semantic map highlighting', () => {
     for (const edge of old.edges) { delete edge.style.startTerminator; delete edge.style.endTerminator; edge.style.arrow = true; }
     const migrated = parseWorkspace(old);
     expect(migrated.nodes[0].tags).toEqual([]);
-    expect(migrated.nodes[0].cardType).toBe('Idea');
+    expect(migrated.nodes[0].cardType).toBe('');
     expect(migrated.searchHistory).toEqual([]);
     expect(migrated.edges[0].style.endTerminator).toBe('solid-arrow');
     old.nodes[0].tags = ['#Garden', 'GARDEN', 'food'];

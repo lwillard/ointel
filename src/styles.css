@@ -547,3 +547,15 @@ nav { padding-top: 8px; }
 .routing-notice { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); max-width: 480px; padding: 9px 14px; border: 1px solid #dccb96; border-radius: 10px; background: #fff9e9; color: #78632e; font-size: 12px; z-index: 5; }
 
 .routing-notice button { color: inherit; text-decoration: underline; font-weight: 600; margin-left: 6px; }
+
+.card-title-row { display: flex; align-items: center; gap: 9px; min-width: 0; flex-shrink: 0; }
+.card-title-row .idea-title { flex: 1; min-width: 0; }
+.card-type-icon { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 28px; width: 28px; height: 28px; color: inherit; }
+.card-type-icon svg { display: block; width: 24px; height: 24px; flex: none; }
+.card-collapse-button { position: absolute; top: 9px; right: 9px; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; border-radius: 6px; color: inherit; opacity: .65; z-index: 2; }
+.card-collapse-button:hover, .card-collapse-button:focus-visible { background: color-mix(in srgb, currentColor 10%, transparent); opacity: 1; }
+.idea-card > .idea-eyebrow { padding-right: 24px; }
+.idea-card.is-collapsed { justify-content: center; padding: 12px 40px 12px 14px; }
+.idea-card.is-collapsed .idea-title { display: block; white-space: nowrap; text-overflow: ellipsis; max-height: none; }
+.editing-title-row { align-items: flex-start; padding-bottom: 9px; }
+.editing-title-row .inline-card-title { min-width: 0; padding-bottom: 0; flex: 1; }

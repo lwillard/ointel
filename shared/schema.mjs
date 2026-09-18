@@ -6,7 +6,7 @@ const color = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 const date = z.string().datetime();
 const body = z.string().max(5_000_000);
 const title = z.string().max(160);
-const cardType = z.string().trim().min(1).max(40).default('Idea');
+const cardType = z.string().trim().max(40).default('');
 const terminator = z.enum(['none', 'solid-arrow', 'white-arrow', 'open-arrow', 'dot', 'hollow-dot', 'diamond', 'one', 'many']);
 const handle = z.enum(['left', 'right', 'top', 'bottom']).nullable().optional();
 const tags = z.array(z.string().max(128).transform(normalizeTag).refine(validTag, 'Tags use letters, numbers, hyphens, or underscores (up to 64 characters).')).max(32).default([]).transform(normalizeTags);
@@ -26,6 +26,7 @@ export const workspaceSchema = z.object({
   customThemes: z.array(z.object({ id: id.refine(value => !value.startsWith('builtin-'), 'Reserved theme ID'), name: z.string().trim().min(1).max(60), style: nodeStyleSchema })).max(100).default([]),
   searchHistory: z.array(z.object({ query: z.string().min(1).max(2000), mode: z.enum(['semantic', 'text']), includeHistory: z.boolean(), cutoff: z.number().min(0).max(0.8), searchedAt: date })).max(50).default([]),
   nodes: z.array(z.object({
+    collapsed: z.boolean().default(false),
     meetingSourceKey: z.string().min(1).max(512).optional(),
     id, title, body, tags, cardType, createdAt: date, updatedAt: date, locked: z.boolean(),
     position: z.object({ x: z.number().finite().min(-1e6).max(1e6), y: z.number().finite().min(-1e6).max(1e6) }),

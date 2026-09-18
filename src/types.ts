@@ -12,6 +12,7 @@ export interface EdgeStyle {
 export type Terminator = 'none' | 'solid-arrow' | 'white-arrow' | 'open-arrow' | 'dot' | 'hollow-dot' | 'diamond' | 'one' | 'many';
 export interface Revision { id: string; title: string; body: string; tags: string[]; cardType: string; savedAt: string }
 export interface Idea {
+  collapsed?: boolean;
   size?: { width: number; height: number };
   meetingSourceKey?: string;
   id: string; title: string; body: string; tags: string[]; cardType: string; createdAt: string; updatedAt: string;

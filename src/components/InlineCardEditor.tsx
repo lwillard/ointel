@@ -4,6 +4,7 @@ import { Check, History, FileText } from 'lucide-react';
 import type { Idea } from '../types';
 import { editorExtensions, serializeNote, type ActiveCardEditor } from '../lib/richText';
 import { TagsEditor } from './TagsEditor';
+import { CardTypeIcon } from './CardTypeIcon';
 import { CardTypeEditor } from './CardTypeEditor';
 import { isNodeLinkMarkdown } from '../../shared/node-links.mjs';
 
@@ -86,12 +87,12 @@ export function InlineCardEditor(props: Props) {
   return <div className="inline-card-editor nodrag nopan nowheel" onDoubleClick={e => e.stopPropagation()} onKeyDown={e => {
     if (!((e.ctrlKey || e.metaKey) && ['s', 'k'].includes(e.key.toLowerCase()))) e.stopPropagation();
   }}>
-    <input ref={title} aria-label="Card title" className={`inline-card-title font-${props.idea.style.font}`} style={{
+    <div className="card-title-row editing-title-row"><CardTypeIcon type={props.idea.cardType} /><input ref={title} aria-label="Card title" className={`inline-card-title font-${props.idea.style.font}`} style={{
       fontSize: props.idea.style.fontSize, fontWeight: props.idea.style.bold ? 650 : 400,
       fontStyle: props.idea.style.italic ? 'italic' : 'normal',
     }} value={props.idea.title} maxLength={160} placeholder="Untitled idea" onFocus={() => props.onActive(null)}
       onChange={e => props.onEdit(props.idea.id, { title: e.target.value })}
-      onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Tab' && !e.shiftKey) { e.preventDefault(); editor?.commands.focus('start'); } if (e.key === 'Escape') props.onDone(); }} />
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Tab' && !e.shiftKey) { e.preventDefault(); editor?.commands.focus('start'); } if (e.key === 'Escape') props.onDone(); }} /></div>
     <div className="inline-note-heading"><FileText size={12} />NOTE<span>Select text to format it with the toolbar above.</span></div>
     <TagsEditor key={props.idea.id} label="Card tags" tags={props.idea.tags} onChange={tags => props.onEdit(props.idea.id, { tags })} />
     <CardTypeEditor value={props.idea.cardType} label="Inline card type" onChange={cardType => props.onEdit(props.idea.id, { cardType })} />
