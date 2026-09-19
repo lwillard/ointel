@@ -12,6 +12,7 @@ import { ConnectionMarkers, markerId } from './ConnectionMarkers';
 import { cardSize, MIN_CARD_SIZE, EDIT_CARD_SIZE, MAX_CARD_SIZE } from '../lib/cardSize';
 import { routeConnections, type Port } from '../lib/connectorRouting';
 import { CardTypeIcon } from './CardTypeIcon';
+import { GroupRegions } from './GroupRegions';
 import { RoutedEdge } from './RoutedEdge';
 import '@xyflow/react/dist/style.css';
 type IdeaNode = Node<{ idea: Idea; dimmed: boolean; editing: boolean }, 'idea'>;
@@ -61,8 +62,9 @@ function IdeaCard({ data, selected }: NodeProps<IdeaNode>) {
 }
 const nodeTypes = { idea: IdeaCard };
 interface Props {
+  selectedGroup: string | null; onGroupSelect: (id: string) => void;
   onCollapse: (id: string, collapsed: boolean) => void;
-  onContextMenu: (kind: 'node' | 'edge' | 'canvas', id: string | null, x: number, y: number) => void;
+  onContextMenu: (kind: 'node' | 'edge' | 'canvas' | 'group', id: string | null, x: number, y: number) => void;
   onReconnect: (id: string, connection: Connection) => void;
   tagMatches: Record<string, SearchResult>; tagCutoff: number;
   editingId: string | null; editingFocus: 'title' | 'body'; onBeginEditing: (id: string, focus?: 'title' | 'body') => void;
@@ -150,6 +152,9 @@ export function MapCanvas(props: Props) {
       fitView fitViewOptions={{ padding: 0.18, maxZoom: 1 }} minZoom={0.15} maxZoom={2}
       deleteKeyCode={null} multiSelectionKeyCode={['Control', 'Meta']} selectionKeyCode="Shift" selectionMode={SelectionMode.Partial} panOnScroll selectionOnDrag={false} zoomOnDoubleClick={false}
       proOptions={{ hideAttribution: true }}>
+      <GroupRegions groups={workspace.groups} selected={props.selectedGroup} members={nodes.map(n => ({ id: n.id, ...n.position, width: n.width || 240, height: n.height || 160, locked: n.data.idea.locked }))}
+        onSelect={props.onGroupSelect} onMove={props.onMoveMany} onContextMenu={(id, x, y) => props.onContextMenu('group', id, x, y)}
+        onPreview={moved => { const positions = new Map(moved.map(n => [n.id, n.position])); setNodes(previous => previous.map(n => positions.has(n.id) ? { ...n, position: positions.get(n.id)! } : n)); }} />
       <Background variant={BackgroundVariant.Dots} gap={22} size={1.2} color="#cbd3c9" />
       {props.minimap && <MiniMap nodeColor={node => (node.data as { idea: Idea }).idea.style.background} nodeStrokeColor="#a5b4a7" nodeBorderRadius={8} maskColor="#f4f6f080" pannable zoomable />}
     </ReactFlow>

@@ -3,12 +3,15 @@ import { type ReactFlowInstance, type Connection } from '@xyflow/react';
 import { Network, Search, Plus, ArrowUpRight, ChevronDown, ChevronRight, Check, CheckCheck, Undo2, Redo2,
   Pin, SlidersHorizontal, PanelRightClose, PanelRightOpen, Download, Upload, FolderOpen, CircleHelp,
   X, Sparkles, Waypoints, GitBranch, CircleDot, Maximize, FileText, Keyboard, LockKeyhole, LoaderCircle,
-  Leaf, Command, LayoutGrid, BookOpen, RotateCcw, AlertCircle } from 'lucide-react';
-import type { Workspace, Idea, NodeStyle, EdgeStyle, VectorStatus, SearchResult, TagSearch, SearchHistoryEntry, CardTheme } from './types';
+  Group, Ungroup, Leaf, Command, LayoutGrid, BookOpen, RotateCcw, AlertCircle } from 'lucide-react';
+import type { Workspace, Idea, NodeStyle, EdgeStyle, VectorStatus, SearchResult, TagSearch, SearchHistoryEntry, CardTheme, GroupStyle } from './types';
 import { tagQuery, tagHighlight, DEFAULT_TAG_DISTANCE, MAX_TAG_DISTANCE } from '../shared/tags.mjs';
 import { initialWorkspace, freshWorkspace, makeIdea, defaultEdgeStyle, uid, now, parseWorkspace, saveRevision, restoreRevision } from './lib/model';
 import { loadWorkspace, persistWorkspace, download } from './lib/persistence';
-import { arrange, type Layout } from './lib/layout';
+import { type Layout } from './lib/layout';
+import { arrangeGroups } from './lib/groupLayout';
+import { cleanGroups, defaultGroupStyle, putInGroup } from './lib/groups';
+import { GroupInspector } from './components/GroupInspector';
 import { cardSize } from './lib/cardSize';
 import { MapCanvas } from './components/MapCanvas';
 import { Inspector } from './components/Inspector';
@@ -108,6 +111,7 @@ export default function App() {
   const [loadError, setLoadError] = useState('');
   const [selected, setSelected] = useState<string | null>('start');
   const [selectedIds, setSelectedIds] = useState<string[]>(['start']);
+  const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
   const [selectedEdge, setSelectedEdge] = useState<string | null>(null);
   const [panelOpen, setPanelOpen] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -122,7 +126,7 @@ export default function App() {
   const [toast, setToast] = useState('');
   const [modal, setModal] = useState<'search' | 'guide' | 'notes' | 'new' | 'import' | 'themes' | 'zoom' | null>(null);
   const [pendingImport, setPendingImport] = useState<Workspace | null>(null);
-  const [contextMenu, setContextMenu] = useState<{ kind: 'node' | 'edge' | 'canvas'; id: string | null; x: number; y: number } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ kind: 'node' | 'edge' | 'canvas' | 'group'; id: string | null; x: number; y: number } | null>(null);
   const closeContextMenu = useCallback(() => setContextMenu(null), []);
   const [vectors, setVectors] = useState<VectorStatus>({ state: 'idle', message: window.ointel ? 'Preparing vector index…' : 'Desktop vector search' });
   const [tagSearch, setTagSearch] = useState<TagSearch | null>(null);
@@ -194,7 +198,14 @@ export default function App() {
     const live = new Set(workspace.nodes.map(node => node.id));
     setSelectedIds(previous => previous.every(id => live.has(id)) ? previous : previous.filter(id => live.has(id)));
     setSelected(previous => previous && live.has(previous) ? previous : null);
-  }, [workspace?.nodes]);
+    setSelectedGroup(previous => previous && workspace.groups.some(g => g.id === previous) ? previous : null);
+  }, [workspace?.nodes, workspace?.groups]);
+  useEffect(() => {
+    const group = workspace?.groups.find(g => g.id === selectedGroup);
+    if (!group) return;
+    setSelectedIds(previous => previous.length === group.nodeIds.length && previous.every(id => group.nodeIds.includes(id)) ? previous : group.nodeIds);
+    setSelected(previous => previous && group.nodeIds.includes(previous) ? previous : group.nodeIds[0]);
+  }, [workspace?.groups, selectedGroup]);
   useEffect(() => {
       const flush = async () => { await stopLiveCapture(); if (current.current) await persistWorkspace(current.current); };
     const off = window.ointel?.onClose(flush);
@@ -207,7 +218,7 @@ export default function App() {
     const next = change(previous); if (next === previous) return;
     if (group !== lastGroup.current) { undoStack.current = [...undoStack.current.slice(-49), previous]; setUndoCount(undoStack.current.length); }
     lastGroup.current = group; redoStack.current = []; setRedoCount(0);
-    const value = { ...next, updatedAt: now() }; current.current = value; setWorkspace(value);
+    const value = { ...next, groups: next.nodes === previous.nodes ? next.groups : cleanGroups(next.groups, new Set(next.nodes.map(n => n.id))), updatedAt: now() }; current.current = value; setWorkspace(value);
   }, []);
   function undo() {
     const value = undoStack.current.pop(); if (!value || !current.current) return;
@@ -220,20 +231,45 @@ export default function App() {
     setUndoCount(undoStack.current.length); setRedoCount(redoStack.current.length); notify('Change restored.');
   }
   const select = useCallback((id: string) => {
-    setSelected(id); setSelectedIds([id]); setSelectedEdge(null); setPanelOpen(true);
+    setSelectedGroup(null); setSelected(id); setSelectedIds([id]); setSelectedEdge(null); setPanelOpen(true);
     setEditingId(current => current === id ? current : null);
     setActiveEditor(current => current?.nodeId === id ? current : null);
   }, []);
   const selectMany = useCallback((ids: string[]) => {
+    setSelectedGroup(null);
     setSelectedIds(previous => previous.length === ids.length && previous.every(id => ids.includes(id)) ? previous : ids);
     setSelected(previous => previous && ids.includes(previous) ? previous : ids.at(-1) || null);
     if (ids.length) setSelectedEdge(null);
     setEditingId(previous => previous && ids.includes(previous) ? previous : null);
     setActiveEditor(previous => previous && ids.includes(previous.nodeId) ? previous : null);
   }, []);
-  const focusCard = useCallback(() => { setSelectedEdge(null); setPanelOpen(true); }, []);
+  const focusCard = useCallback((id: string) => { if (selectedGroup) select(id); else { setSelectedGroup(null); setSelectedEdge(null); setPanelOpen(true); } }, [selectedGroup, select]);
   function selectAllCards() { if (current.current) selectMany(current.current.nodes.map(node => node.id)); }
   function clearCardSelection() { selectMany([]); setSelectedEdge(null); }
+  function selectGroup(id: string) {
+    const group = current.current?.groups.find(g => g.id === id); if (!group) return;
+    finishEditing(); setSelectedGroup(id); setSelectedIds(group.nodeIds); setSelected(group.nodeIds[0]); setSelectedEdge(null); setPanelOpen(true);
+  }
+  function groupCards() {
+    if (!current.current || selectedIds.length < 2) return;
+    if (current.current.groups.length >= 1000) return notify('This map has reached its limit of 1,000 groups.');
+    const group = { id: uid(), name: `Group ${current.current.groups.length + 1}`, nodeIds: selectedIds, style: { ...defaultGroupStyle } };
+    commit(w => putInGroup(w, group)); selectGroup(group.id);
+    notify('Cards grouped. Drag the boundary to move them together.');
+  }
+  function ungroup(id = selectedGroup) {
+    if (!id) return;
+    commit(w => ({ ...w, groups: w.groups.filter(g => g.id !== id) })); setSelectedGroup(null);
+    notify('Group removed. Cards and connections kept.');
+  }
+  function editGroup(patch: { name?: string; style?: Partial<GroupStyle> }) {
+    commit(w => ({ ...w, groups: w.groups.map(g => g.id === selectedGroup ? { ...g, name: patch.name?.trim() || g.name, style: { ...g.style, ...patch.style } } : g) }), `group-style-${selectedGroup}`);
+  }
+  function groupMembers(ids: string[]) {
+    const group = current.current?.groups.find(g => g.id === selectedGroup); if (!group) return;
+    commit(w => putInGroup(w, { ...group, nodeIds: ids }));
+    if (ids.length) selectGroup(group.id); else { setSelectedGroup(null); setSelectedIds([]); setSelected(null); }
+  }
   function moveCards(moved: { id: string; position: { x: number; y: number } }[]) {
     const positions = new Map(moved.map(node => [node.id, node.position]));
     commit(w => {
@@ -353,6 +389,7 @@ export default function App() {
     notify('Connection made. Click the line to style it.');
   }
   function deleteSelection() {
+    if (selectedGroup) { ungroup(); return; }
     finishEditing();
     if (selectedEdge) { commit(w => ({ ...w, edges: w.edges.filter(e => e.id !== selectedEdge) })); setSelectedEdge(null); notify('Connection removed. Undo to bring it back.'); }
     else if (selectedIds.length) { const ids = new Set(selectedIds); commit(w => ({ ...w, nodes: w.nodes.filter(n => !ids.has(n.id)), edges: w.edges.filter(e => !ids.has(e.source) && !ids.has(e.target)) })); setSelected(null); setSelectedIds([]); notify(`${ids.size} cards removed. Undo to bring them back.`); }
@@ -379,14 +416,19 @@ export default function App() {
     const { id, kind, x, y } = contextMenu;
     const node = workspace.nodes.find(node => node.id === id);
     const edge = workspace.edges.find(edge => edge.id === id);
+    const cardGroup = workspace.groups.find(g => g.nodeIds.includes(id || ''));
+    if (kind === 'group') return [{ label: 'Edit group boundary', action: () => selectGroup(id!) }, { label: 'Ungroup cards', action: () => ungroup(id!) }];
     if (kind === 'node' && node && selectedIds.length > 1 && selectedIds.includes(node.id)) return [
+      { label: 'Group selected cards', action: groupCards },
+      ...(cardGroup ? [{ label: 'Edit group boundary', action: () => selectGroup(cardGroup.id) }, { label: 'Ungroup cards', action: () => ungroup(cardGroup.id) }] : []),
       { label: `Theme ${selectedIds.length} selected cards…`, action: () => setModal('themes') },
       { label: 'Pin selected cards', action: () => commit(w => ({ ...w, nodes: w.nodes.map(n => selectedIds.includes(n.id) ? { ...n, locked: true } : n) })) },
       { label: 'Unpin selected cards', action: () => commit(w => ({ ...w, nodes: w.nodes.map(n => selectedIds.includes(n.id) ? { ...n, locked: false } : n) })) },
-      { label: `Delete selected cards (${selectedIds.length})`, danger: true, action: deleteSelection },
+      { label: `Delete selected cards (${selectedIds.length})`, danger: true, action: () => { const ids = new Set(selectedIds); commit(w => ({ ...w, nodes: w.nodes.filter(n => !ids.has(n.id)), edges: w.edges.filter(e => !ids.has(e.source) && !ids.has(e.target)) })); setSelectedGroup(null); } },
       { label: 'Edit this card', action: () => beginEditing(node.id) },
     ];
     if (kind === 'node' && node) return [
+      ...(cardGroup ? [{ label: 'Select group', action: () => selectGroup(cardGroup.id) }, { label: 'Remove card from group', action: () => commit(w => putInGroup(w, { ...cardGroup, nodeIds: cardGroup.nodeIds.filter(n => n !== node.id) })) }] : []),
       { label: 'Copy node link', action: () => { void copyNodeLink(node); } },
       { label: 'Edit card', action: () => beginEditing(node.id) },
       { label: 'Add child node', action: () => addIdea(node.id) },
@@ -400,7 +442,7 @@ export default function App() {
       { label: `Delete branch (${branchNodeIds(workspace, node.id).size} nodes)`, danger: true, action: () => deleteNodes(node.id, true) },
     ];
     if (kind === 'edge' && edge) return [
-      { label: 'Edit connection', action: () => { finishEditing(); setSelectedIds([]); setSelected(null); setSelectedEdge(edge.id); setPanelOpen(true); } },
+      { label: 'Edit connection', action: () => { finishEditing(); setSelectedGroup(null); setSelectedIds([]); setSelected(null); setSelectedEdge(edge.id); setPanelOpen(true); } },
       { label: 'Reverse connection', action: () => reconnect(edge.id, { source: edge.target, target: edge.source, sourceHandle: edge.targetHandle || null, targetHandle: edge.sourceHandle || null }) },
       { label: 'Delete connection', danger: true, action: () => { commit(w => ({ ...w, edges: w.edges.filter(e => e.id !== edge.id) })); setSelectedEdge(null); notify('Connection deleted. Undo restores it.'); } },
     ];
@@ -410,7 +452,7 @@ export default function App() {
   function autoArrange(algorithm = layout) {
     finishEditing();
     setLayout(algorithm); setLayoutMenu(false);
-    commit(w => ({ ...w, nodes: arrange(w.nodes, w.edges, algorithm) })); setTimeout(fit, 70);
+    commit(w => ({ ...w, nodes: arrangeGroups(w, algorithm) })); setTimeout(fit, 70);
     notify(`Map arranged. ${current.current?.nodes.filter(n => n.locked).length || 0} pinned ideas kept in place.`);
   }
   function exportMap() { if (current.current) { download(`${current.current.title.replace(/[^a-z0-9 _-]/gi, '') || 'mind-map'}.ointel.json`, JSON.stringify(current.current, null, 2)); notify('Map exported with notes, images, and history.'); } }
@@ -419,7 +461,7 @@ export default function App() {
     catch (e) { notify(`Could not import: ${e instanceof Error ? e.message.slice(0, 180) : 'Invalid map file.'}`); }
   }
   function replaceWorkspace(next: Workspace) {
-    setTagSearch(null);
+    setTagSearch(null); setSelectedGroup(null);
     finishEditing();
     commit(() => next); setSelected(next.nodes[0]?.id || null); setSelectedIds(next.nodes[0] ? [next.nodes[0].id] : []); setSelectedEdge(null); setModal(null); setPendingImport(null); setFilter(''); setTimeout(fit, 80);
   }
@@ -451,7 +493,7 @@ export default function App() {
     document.addEventListener('copy', onCopy);
     return () => document.removeEventListener('copy', onCopy);
   }, [notify]);
-  const keyboardActions = useRef({ addIdea, undo, redo, exportMap, deleteSelection, selectAllCards }); keyboardActions.current = { addIdea, undo, redo, exportMap, deleteSelection, selectAllCards };
+  const keyboardActions = useRef({ addIdea, undo, redo, exportMap, deleteSelection, selectAllCards, groupCards, ungroup }); keyboardActions.current = { addIdea, undo, redo, exportMap, deleteSelection, selectAllCards, groupCards, ungroup };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const typing = (e.target as HTMLElement)?.closest('input, textarea, [contenteditable="true"]');
@@ -460,6 +502,7 @@ export default function App() {
       if (typing || (e.target as HTMLElement)?.closest('[role="dialog"]')) return;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); if (e.shiftKey) keyboardActions.current.redo(); else keyboardActions.current.undo(); }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') { e.preventDefault(); keyboardActions.current.selectAllCards(); }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'g') { e.preventDefault(); if (e.shiftKey) keyboardActions.current.ungroup(); else keyboardActions.current.groupCards(); }
       if (e.key === 'Delete') { e.preventDefault(); keyboardActions.current.deleteSelection(); }
       if (!e.ctrlKey && !e.metaKey && e.key.toLowerCase() === 'n') keyboardActions.current.addIdea();
     };
@@ -468,6 +511,7 @@ export default function App() {
   if (loadError) return <div className="loading-screen"><Brand /><h2>Your workspace needs attention.</h2><p>{loadError}</p><button className="secondary" onClick={() => void window.ointel?.reveal()}><FolderOpen size={16} />Open data folder</button><button className="text-button" onClick={() => location.reload()}>Try again</button></div>;
   if (!workspace) return <div className="loading-screen"><Brand /><LoaderCircle size={24} className="spin" /><p>Making room for your thoughts…</p></div>;
   const idea = workspace.nodes.find(n => n.id === selected);
+  const group = workspace.groups.find(g => g.id === selectedGroup);
   const selectedCards = workspace.nodes.filter(node => selectedIds.includes(node.id));
   const selectionLocked = selectedCards.length > 0 && selectedCards.every(card => card.locked);
   const themes = [...builtInThemes, ...workspace.customThemes];
@@ -493,6 +537,7 @@ export default function App() {
         <button className={`toolbar-button pin-toolbar ${selectionLocked ? 'active' : ''}`} disabled={!selectedCards.length} onClick={() => commit(w => ({ ...w, nodes: w.nodes.map(node => selectedIds.includes(node.id) ? { ...node, locked: !selectionLocked } : node) }))}><Pin size={14} /><span>{selectedCards.length > 1 ? (selectionLocked ? 'Unpin selected' : 'Pin selected') : (selectionLocked ? 'Unpin' : 'Pin position')}</span></button></div>
         <div className="toolbar-right"><button className="icon-button" title="Undo (Ctrl+Z)" aria-label="Undo" disabled={!undoCount} onClick={undo}><Undo2 size={16} /></button><button className="icon-button" title="Redo (Ctrl+Shift+Z)" aria-label="Redo" disabled={!redoCount} onClick={redo}><Redo2 size={16} /></button><span className="toolbar-divider" /><button className={`icon-button minimap-button ${minimap ? 'active' : ''}`} title="Toggle minimap" aria-label="Toggle minimap" onClick={() => setMinimap(!minimap)}><LayoutGrid size={16} /></button><button className="icon-button" title="Toggle details" aria-label="Toggle details" onClick={() => { setPanelOpen(!panelOpen); clearTimeout(detailsFitTimer.current); detailsFitTimer.current = setTimeout(fit, 100); }}>{panelOpen ? <PanelRightClose size={17} /> : <PanelRightOpen size={17} />}</button><button className="primary add-node" onClick={() => addIdea()}><Plus size={16} /><span>Add idea</span></button></div>
       </div>
+        <div className="groups-toolbar" role="toolbar" aria-label="Card groups"><span><Group size={15} />Groups</span><button className="toolbar-button" disabled={selectedCards.length < 2} onClick={groupCards} title="Group selected cards (Ctrl/Cmd+G)"><Group size={15} />Group selected</button><button className="toolbar-button" disabled={!group} onClick={() => ungroup()} title="Ungroup (Ctrl/Cmd+Shift+G)"><Ungroup size={15} />Ungroup</button><select aria-label="Select card group" value={selectedGroup || ''} onChange={e => { if (e.target.value) selectGroup(e.target.value); else clearCardSelection(); }}><option value="">{workspace.groups.length ? `${workspace.groups.length} groups in this map` : 'No groups yet'}</option>{workspace.groups.map(g => <option key={g.id} value={g.id}>{g.name} ({g.nodeIds.length})</option>)}</select><small>Select cards, then group them in a soft boundary.</small></div>
         <ThemesToolbar themes={themes} selected={selectedCards} total={workspace.nodes.length} onApply={applyTheme} onEdit={() => setModal('themes')} onSelectAll={selectAllCards} onClear={clearCardSelection} />
         <FormattingToolbar active={activeEditor} nodes={workspace.nodes} onImage={insertCardImage} />
         {tagSearch && <div className="tag-map-legend" role="region" aria-label="Tag search highlights">
@@ -502,15 +547,16 @@ export default function App() {
           {tagSearch.error && <span role="status" className="tag-search-error">{tagSearch.error}</span>}
           <button className="icon-button" aria-label="Clear tag highlights" onClick={() => setTagSearch(null)}><X size={16} /></button>
         </div>}
-      <div className="workspace-body"><MapCanvas onReconnect={reconnect} onContextMenu={(kind, id, x, y) => { setContextMenu({ kind, id, x, y }); }} tagMatches={tagMatches} tagCutoff={tagSearch?.cutoff ?? DEFAULT_TAG_DISTANCE} workspace={workspace} selectedIds={selectedIds} onSelectMany={selectMany} selectedEdge={selectedEdge} search={filter} zoom={zoom}
+      <div className="workspace-body"><MapCanvas selectedGroup={selectedGroup} onGroupSelect={selectGroup} onReconnect={reconnect} onContextMenu={(kind, id, x, y) => { setContextMenu({ kind, id, x, y }); }} tagMatches={tagMatches} tagCutoff={tagSearch?.cutoff ?? DEFAULT_TAG_DISTANCE} workspace={workspace} selectedIds={selectedIds} onSelectMany={selectMany} selectedEdge={selectedEdge} search={filter} zoom={zoom}
         editingId={editingId} editingFocus={editingFocus} onBeginEditing={beginEditing} onFinishEditing={finishEditing}
         onActiveEditor={setActiveEditor} onEdit={editCard} onSaveVersion={saveCardVersion} onImage={insertCardImage} onNavigate={navigate}
-        onSelect={focusCard} onEdgeSelect={id => { finishEditing(); setSelectedIds([]); setSelected(null); setSelectedEdge(id); setPanelOpen(true); }}
+        onSelect={focusCard} onEdgeSelect={id => { finishEditing(); setSelectedGroup(null); setSelectedIds([]); setSelected(null); setSelectedEdge(id); setPanelOpen(true); }}
         onMoveMany={moveCards} onResize={resizeCard} onCollapse={collapseCard}
         onConnect={connect} onInit={instance => { flow.current = instance; }} onZoom={setZoom}
         onAdd={position => addIdea(undefined, position)} onFit={fit} onZoomIn={() => void flow.current?.zoomIn({ duration: 200 })} onZoomOut={() => void flow.current?.zoomOut({ duration: 200 })} minimap={minimap} />
-        {panelOpen && selectedCards.length > 1 && !selectedEdge && <SelectionInspector cards={selectedCards} onChange={styleNode} onEditTheme={() => setModal('themes')} onDelete={deleteSelection} onClose={() => setPanelOpen(false)} />}
-        {panelOpen && (selectedCards.length <= 1 || selectedEdge) && <Inspector onReconnect={reconnect} workspace={workspace} idea={selectedEdge ? undefined : idea} edge={edge} onClose={() => setPanelOpen(false)}
+        {panelOpen && group && <GroupInspector group={group} nodes={workspace.nodes} onName={name => editGroup({ name })} onStyle={style => editGroup({ style })} onMembers={groupMembers} onUngroup={() => ungroup()} onClose={() => setPanelOpen(false)} />}
+        {panelOpen && !group && selectedCards.length > 1 && !selectedEdge && <SelectionInspector cards={selectedCards} onChange={styleNode} onEditTheme={() => setModal('themes')} onDelete={deleteSelection} onClose={() => setPanelOpen(false)} />}
+        {panelOpen && !group && (selectedCards.length <= 1 || selectedEdge) && <Inspector onReconnect={reconnect} workspace={workspace} idea={selectedEdge ? undefined : idea} edge={edge} onClose={() => setPanelOpen(false)}
           onEditCard={() => selected && beginEditing(selected)}
           onEdit={patch => editNode(patch, `edit-${selected}`)} onNodeStyle={styleNode} onEdgeStyle={styleEdge} onLock={() => idea && editNode({ locked: !idea.locked })}
           onSaveVersion={() => { commit(w => ({ ...w, nodes: w.nodes.map(n => n.id === selected ? saveRevision(n) : n) })); notify('A moment in your thinking, saved.'); }}

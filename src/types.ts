@@ -20,7 +20,13 @@ export interface Idea {
 }
 export interface Connector { id: string; source: string; target: string; sourceHandle?: string | null; targetHandle?: string | null; style: EdgeStyle }
 export interface SearchHistoryEntry { query: string; mode: 'semantic' | 'text'; includeHistory: boolean; cutoff: number; searchedAt: string }
+export interface GroupStyle {
+  background: string; opacity: number; borderColor: string; borderWidth: number; borderStyle: 'solid' | 'dashed' | 'dotted';
+  textColor: string; padding: number; roundness: number; shadow: boolean; shadowColor: string; shadowBlur: number;
+}
+export interface CardGroup { id: string; name: string; nodeIds: string[]; style: GroupStyle }
 export interface Workspace {
+  groups: CardGroup[];
   schemaVersion: 1; id: string; title: string; updatedAt: string;
   nodes: Idea[]; edges: Connector[]; assets: Record<string, string>;
   searchHistory: SearchHistoryEntry[];

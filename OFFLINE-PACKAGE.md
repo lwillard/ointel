@@ -1,6 +1,6 @@
 # Ointel offline package for Apple Silicon
 
-Version 0.6.8 replaces filtered type suggestions with a complete dropdown containing every predefined icon type and alias, plus No type. Both the inspector and inline editor retain custom type entry.
+Version 0.6.9 adds named card groups with smooth blob boundaries, adjustable fill, opacity, borders, softness, padding, and shadows. Move a group by dragging its region or label; auto-arrange preserves its internal layout and honors pinned members. Group membership and styles autosave, export, and support undo/redo. Ungroup keeps all cards and connections.
 
 Download the **arm64 DMG** from this release, open it, and drag **Ointel.app** to Applications. Launch the installed app. The ZIP contains the same app for transfer or extraction without a disk image.
 

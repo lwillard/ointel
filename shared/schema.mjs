@@ -23,6 +23,10 @@ export const edgeStyleSchema = z.object({
 }).transform(style => ({ ...style, endTerminator: style.endTerminator ?? (style.arrow ? 'solid-arrow' : 'none') }));
 export const workspaceSchema = z.object({
   schemaVersion: z.literal(1), id, title: z.string().min(1).max(160), updatedAt: date,
+  groups: z.array(z.object({ id, name: z.string().trim().min(1).max(80), nodeIds: z.array(id).min(1).max(5000), style: z.object({
+    background: color, opacity: z.number().min(0).max(1), borderColor: color, borderWidth: z.number().min(0).max(8), borderStyle: z.enum(['solid', 'dashed', 'dotted']),
+    textColor: color, padding: z.number().min(20).max(120), roundness: z.number().min(0).max(1), shadow: z.boolean(), shadowColor: color, shadowBlur: z.number().min(0).max(40),
+  }) })).max(1000).default([]),
   customThemes: z.array(z.object({ id: id.refine(value => !value.startsWith('builtin-'), 'Reserved theme ID'), name: z.string().trim().min(1).max(60), style: nodeStyleSchema })).max(100).default([]),
   searchHistory: z.array(z.object({ query: z.string().min(1).max(2000), mode: z.enum(['semantic', 'text']), includeHistory: z.boolean(), cutoff: z.number().min(0).max(0.8), searchedAt: date })).max(50).default([]),
   nodes: z.array(z.object({
@@ -39,6 +43,13 @@ export const workspaceSchema = z.object({
     z.string().max(14_000_000).regex(/^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/)),
 }).superRefine((value, ctx) => {
   const ids = new Set(value.nodes.map(n => n.id));
+  if (new Set(value.groups.map(g => g.id)).size !== value.groups.length) ctx.addIssue({ code: 'custom', message: 'Duplicate group IDs' });
+  const grouped = new Set();
+  for (const group of value.groups) for (const nodeId of group.nodeIds) {
+    if (!ids.has(nodeId)) ctx.addIssue({ code: 'custom', message: 'Group points to a missing card' });
+    if (grouped.has(nodeId)) ctx.addIssue({ code: 'custom', message: 'A card can belong to only one group' });
+    grouped.add(nodeId);
+  }
   if (new Set(value.customThemes.map(theme => theme.id)).size !== value.customThemes.length) ctx.addIssue({ code: 'custom', message: 'Duplicate theme IDs' });
   if (ids.size !== value.nodes.length) ctx.addIssue({ code: 'custom', message: 'Duplicate node IDs' });
   if (new Set(value.edges.map(e => e.id)).size !== value.edges.length) ctx.addIssue({ code: 'custom', message: 'Duplicate connector IDs' });

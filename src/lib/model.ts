@@ -33,7 +33,7 @@ export function restoreRevision(node: Idea, revisionId: string): Idea {
 }
 export function parseWorkspace(input: unknown): Workspace { return workspaceSchema.parse(input) as Workspace; }
 export function freshWorkspace(): Workspace {
-  return { schemaVersion: 1, id: uid(), title: 'Untitled mind map', updatedAt: now(), nodes: [], edges: [], assets: {}, searchHistory: [], customThemes: [] };
+  return { schemaVersion: 1, id: uid(), title: 'Untitled mind map', updatedAt: now(), nodes: [], edges: [], groups: [], assets: {}, searchHistory: [], customThemes: [] };
 }
 export function initialWorkspace(): Workspace {
   const root = makeIdea('A more connected mind', { x: 400, y: 230 },
