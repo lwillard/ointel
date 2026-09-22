@@ -81,9 +81,9 @@ test('groups move, reshape, style, persist, and ungroup without losing cards', a
     await page.getByRole('button', { name: 'Undo', exact: true }).click(); await expect(boundary).toHaveCount(1);
     await page.getByRole('button', { name: 'Select all cards', exact: true }).click();
     await page.keyboard.press(process.platform === 'darwin' ? 'Meta+g' : 'Control+g');
-    await expect.poll(async () => (await save()).groups[0]?.nodeIds.length).toBe(3);
+    await expect.poll(async () => (await save()).groups.at(-1)?.nodeIds.length).toBe(3);
     await page.keyboard.press(process.platform === 'darwin' ? 'Meta+Shift+g' : 'Control+Shift+g');
-    await expect(boundary).toHaveCount(0); await expect.poll(async () => (await save()).nodes.length).toBe(3);
+    await expect(boundary).toHaveCount(1); await expect.poll(async () => (await save()).nodes.length).toBe(3);
     expect(errors).toEqual([]);
   } finally { await app.evaluate(({ app }) => app.exit()); }
 });

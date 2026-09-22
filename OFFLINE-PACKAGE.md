@@ -1,6 +1,6 @@
 # Ointel offline package for Apple Silicon
 
-Version 0.6.9 adds named card groups with smooth blob boundaries, adjustable fill, opacity, borders, softness, padding, and shadows. Move a group by dragging its region or label; auto-arrange preserves its internal layout and honors pinned members. Group membership and styles autosave, export, and support undo/redo. Ungroup keeps all cards and connections.
+Version 0.6.10 adds shared membership across card groups and Ctrl/Cmd-click plus Ctrl/Cmd+G to add cards to the selected group. A new Tasks panel lists Task cards with dates read from due: in their notes, editable status, and click-to-focus navigation. Task states are new, in progress, canceled, and completed, and are preserved in saved history and exports.
 
 Download the **arm64 DMG** from this release, open it, and drag **Ointel.app** to Applications. Launch the installed app. The ZIP contains the same app for transfer or extraction without a disk image.
 

@@ -9,9 +9,11 @@ export function cleanGroups(groups: CardGroup[], liveIds: Set<string>): CardGrou
 }
 export function putInGroup(workspace: Workspace, group: CardGroup): Workspace {
   const live = new Set(workspace.nodes.map(n => n.id)), members = [...new Set(group.nodeIds)].filter(id => live.has(id));
-  const memberSet = new Set(members);
-  const groups = workspace.groups.filter(g => g.id !== group.id).map(g => ({ ...g, nodeIds: g.nodeIds.filter(id => !memberSet.has(id)) })).filter(g => g.nodeIds.length);
-  return { ...workspace, groups: members.length ? [...groups, { ...group, nodeIds: members }] : groups };
+  const next = { ...group, nodeIds: members };
+  const groups = workspace.groups.some(g => g.id === group.id)
+    ? workspace.groups.flatMap(g => g.id === group.id ? (members.length ? [next] : []) : [g])
+    : members.length ? [...workspace.groups, next] : workspace.groups;
+  return { ...workspace, groups };
 }
 
 export type RegionRect = { x: number; y: number; width: number; height: number };

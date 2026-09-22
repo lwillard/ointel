@@ -5,6 +5,7 @@ import type { Idea } from '../types';
 import { editorExtensions, serializeNote, type ActiveCardEditor } from '../lib/richText';
 import { TagsEditor } from './TagsEditor';
 import { CardTypeIcon } from './CardTypeIcon';
+import { TaskStateEditor } from './TaskStateEditor';
 import { CardTypeEditor } from './CardTypeEditor';
 import { isNodeLinkMarkdown } from '../../shared/node-links.mjs';
 
@@ -83,7 +84,7 @@ export function InlineCardEditor(props: Props) {
       editor.commands.setContent(props.idea.body, { contentType: 'markdown', emitUpdate: false });
     }
   }, [props.idea.body, editor]);
-  const changed = props.idea.history.at(-1)?.cardType !== props.idea.cardType || props.idea.history.at(-1)?.body !== props.idea.body || props.idea.history.at(-1)?.title !== props.idea.title || JSON.stringify(props.idea.history.at(-1)?.tags) !== JSON.stringify(props.idea.tags);
+  const changed = (props.idea.history.at(-1)?.taskState || 'new') !== (props.idea.taskState || 'new') || props.idea.history.at(-1)?.cardType !== props.idea.cardType || props.idea.history.at(-1)?.body !== props.idea.body || props.idea.history.at(-1)?.title !== props.idea.title || JSON.stringify(props.idea.history.at(-1)?.tags) !== JSON.stringify(props.idea.tags);
   return <div className="inline-card-editor nodrag nopan nowheel" onDoubleClick={e => e.stopPropagation()} onKeyDown={e => {
     if (!((e.ctrlKey || e.metaKey) && ['s', 'k'].includes(e.key.toLowerCase()))) e.stopPropagation();
   }}>
@@ -96,6 +97,7 @@ export function InlineCardEditor(props: Props) {
     <div className="inline-note-heading"><FileText size={12} />NOTE<span>Select text to format it with the toolbar above.</span></div>
     <TagsEditor key={props.idea.id} label="Card tags" tags={props.idea.tags} onChange={tags => props.onEdit(props.idea.id, { tags })} />
     <CardTypeEditor value={props.idea.cardType} label="Inline card type" onChange={cardType => props.onEdit(props.idea.id, { cardType })} />
+    <TaskStateEditor idea={props.idea} label="Inline task state" onChange={taskState => props.onEdit(props.idea.id, { taskState })} />
     <div className="inline-note-scroll"><EditorContent editor={editor} /></div>
     <div className="inline-edit-footer"><span>Autosaved · Esc to finish</span><button className="text-button" disabled={!changed} onClick={() => props.onSave(props.idea.id)}><History size={13} />Save version</button><button className="secondary small" onClick={props.onDone}><Check size={13} />Done</button></div>
   </div>;

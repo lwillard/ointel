@@ -17,19 +17,19 @@ export const palettes = [
 ];
 export function makeIdea(title = 'Untitled idea', position = { x: 0, y: 0 }, body = ''): Idea {
   const date = now();
-  return { id: uid(), title, body, tags: [], cardType: 'Idea', createdAt: date, updatedAt: date, position, locked: false,
-    style: { ...defaultNodeStyle }, history: [{ id: uid(), title, body, tags: [], cardType: 'Idea', savedAt: date }] };
+  return { id: uid(), title, body, tags: [], cardType: 'Idea', taskState: 'new', createdAt: date, updatedAt: date, position, locked: false,
+    style: { ...defaultNodeStyle }, history: [{ id: uid(), title, body, tags: [], cardType: 'Idea', taskState: 'new', savedAt: date }] };
 }
 export function saveRevision(node: Idea): Idea {
   const latest = node.history.at(-1);
-  if (latest?.title === node.title && latest.body === node.body && latest.cardType === node.cardType && JSON.stringify(latest.tags) === JSON.stringify(node.tags)) return node;
-  return { ...node, updatedAt: now(), history: [...node.history, { id: uid(), title: node.title, body: node.body, tags: [...node.tags], cardType: node.cardType, savedAt: now() }] };
+  if (latest?.title === node.title && latest.body === node.body && latest.cardType === node.cardType && (latest.taskState || 'new') === (node.taskState || 'new') && JSON.stringify(latest.tags) === JSON.stringify(node.tags)) return node;
+  return { ...node, updatedAt: now(), history: [...node.history, { id: uid(), title: node.title, body: node.body, tags: [...node.tags], cardType: node.cardType, taskState: node.taskState || 'new', savedAt: now() }] };
 }
 export function restoreRevision(node: Idea, revisionId: string): Idea {
   const revision = node.history.find(r => r.id === revisionId);
   if (!revision) return node;
   const preserved = saveRevision(node);
-  return saveRevision({ ...preserved, title: revision.title, body: revision.body, tags: [...revision.tags], cardType: revision.cardType });
+  return saveRevision({ ...preserved, title: revision.title, body: revision.body, tags: [...revision.tags], cardType: revision.cardType, taskState: revision.taskState || 'new' });
 }
 export function parseWorkspace(input: unknown): Workspace { return workspaceSchema.parse(input) as Workspace; }
 export function freshWorkspace(): Workspace {

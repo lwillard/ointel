@@ -7,6 +7,7 @@ const date = z.string().datetime();
 const body = z.string().max(5_000_000);
 const title = z.string().max(160);
 const cardType = z.string().trim().max(40).default('');
+const taskState = z.enum(['new', 'in progress', 'canceled', 'completed']).default('new');
 const terminator = z.enum(['none', 'solid-arrow', 'white-arrow', 'open-arrow', 'dot', 'hollow-dot', 'diamond', 'one', 'many']);
 const handle = z.enum(['left', 'right', 'top', 'bottom']).nullable().optional();
 const tags = z.array(z.string().max(128).transform(normalizeTag).refine(validTag, 'Tags use letters, numbers, hyphens, or underscores (up to 64 characters).')).max(32).default([]).transform(normalizeTags);
@@ -32,11 +33,11 @@ export const workspaceSchema = z.object({
   nodes: z.array(z.object({
     collapsed: z.boolean().default(false),
     meetingSourceKey: z.string().min(1).max(512).optional(),
-    id, title, body, tags, cardType, createdAt: date, updatedAt: date, locked: z.boolean(),
+    id, title, body, tags, cardType, taskState, createdAt: date, updatedAt: date, locked: z.boolean(),
     position: z.object({ x: z.number().finite().min(-1e6).max(1e6), y: z.number().finite().min(-1e6).max(1e6) }),
     size: z.object({ width: z.number().finite().min(240).max(2000), height: z.number().finite().min(160).max(2000) }).optional(),
     style: nodeStyleSchema,
-    history: z.array(z.object({ id, title, body, tags, cardType, savedAt: date })).max(10000),
+    history: z.array(z.object({ id, title, body, tags, cardType, taskState, savedAt: date })).max(10000),
   })).max(5000),
   edges: z.array(z.object({ id, source: id, target: id, sourceHandle: handle, targetHandle: handle, style: edgeStyleSchema })).max(20000),
   assets: z.record(z.string().regex(/^assets\/[a-zA-Z0-9_-]+\.(png|jpg|webp|gif)$/),
@@ -44,11 +45,11 @@ export const workspaceSchema = z.object({
 }).superRefine((value, ctx) => {
   const ids = new Set(value.nodes.map(n => n.id));
   if (new Set(value.groups.map(g => g.id)).size !== value.groups.length) ctx.addIssue({ code: 'custom', message: 'Duplicate group IDs' });
-  const grouped = new Set();
-  for (const group of value.groups) for (const nodeId of group.nodeIds) {
-    if (!ids.has(nodeId)) ctx.addIssue({ code: 'custom', message: 'Group points to a missing card' });
-    if (grouped.has(nodeId)) ctx.addIssue({ code: 'custom', message: 'A card can belong to only one group' });
-    grouped.add(nodeId);
+  for (const group of value.groups) {
+    if (new Set(group.nodeIds).size !== group.nodeIds.length) ctx.addIssue({ code: 'custom', message: 'Duplicate card in group' });
+    for (const nodeId of group.nodeIds) {
+      if (!ids.has(nodeId)) ctx.addIssue({ code: 'custom', message: 'Group points to a missing card' });
+    }
   }
   if (new Set(value.customThemes.map(theme => theme.id)).size !== value.customThemes.length) ctx.addIssue({ code: 'custom', message: 'Duplicate theme IDs' });
   if (ids.size !== value.nodes.length) ctx.addIssue({ code: 'custom', message: 'Duplicate node IDs' });

@@ -10,8 +10,10 @@ export interface EdgeStyle {
   startTerminator: Terminator; endTerminator: Terminator;
 }
 export type Terminator = 'none' | 'solid-arrow' | 'white-arrow' | 'open-arrow' | 'dot' | 'hollow-dot' | 'diamond' | 'one' | 'many';
-export interface Revision { id: string; title: string; body: string; tags: string[]; cardType: string; savedAt: string }
+export type TaskState = 'new' | 'in progress' | 'canceled' | 'completed';
+export interface Revision { taskState?: TaskState; id: string; title: string; body: string; tags: string[]; cardType: string; savedAt: string }
 export interface Idea {
+  taskState?: TaskState;
   collapsed?: boolean;
   size?: { width: number; height: number };
   meetingSourceKey?: string;

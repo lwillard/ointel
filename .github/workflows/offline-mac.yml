@@ -29,8 +29,8 @@ jobs:
         run: npm run test:speech
       - name: Build self-contained DMG and ZIP
         run: npm run package:mac
-      - name: Verify groups, card collapse, type icons, and live connector routing on macOS
-        run: OINTEL_BUNDLED_MODELS="$PWD/build/offline-models" npx playwright test tests/e2e/connector-routing.spec.ts tests/e2e/card-collapse.spec.ts tests/e2e/groups.spec.ts
+      - name: Verify tasks, shared groups, card collapse, and live connector routing on macOS
+        run: OINTEL_BUNDLED_MODELS="$PWD/build/offline-models" npx playwright test tests/e2e/connector-routing.spec.ts tests/e2e/card-collapse.spec.ts tests/e2e/groups.spec.ts tests/e2e/tasks-and-shared-groups.spec.ts
       - name: Verify model loading without network or an existing user cache
         run: OINTEL_BUNDLED_MODELS="$PWD/build/offline-models" npm run test:offline
       - name: Verify packaged editing, semantic search, and speech without model downloads

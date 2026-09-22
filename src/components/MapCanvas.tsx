@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useCallback } from 'react';
+import { createContext, useContext, useEffect, useMemo, useCallback, useRef } from 'react';
 import { ReactFlow, Background, BackgroundVariant, Handle, Position, MiniMap, SelectionMode, NodeResizeControl,
   applyNodeChanges, useNodesState, useUpdateNodeInternals, type Node, type NodeChange, type Edge, type NodeProps, type ReactFlowInstance, type Connection } from '@xyflow/react';
 import { FileText, Pin, Sprout, Plus, Maximize, Minus, ChevronUp, ChevronDown } from 'lucide-react';
@@ -72,8 +72,8 @@ interface Props {
   onEdit: (id: string, patch: Partial<Idea>) => void; onSaveVersion: (id: string) => void;
   onImage: (id: string, file: File, editor: ActiveCardEditor['editor']) => void; onNavigate: (id: string) => void;
   workspace: Workspace; selectedIds: string[]; selectedEdge: string | null; search: string; zoom: number;
-  onSelectMany: (ids: string[]) => void;
-  onSelect: (id: string) => void; onEdgeSelect: (id: string) => void;
+  onSelectMany: (ids: string[], additive?: boolean) => void;
+  onSelect: (id: string, additive?: boolean) => void; onEdgeSelect: (id: string) => void;
   onMoveMany: (nodes: { id: string; position: { x: number; y: number } }[]) => void;
   onResize: (id: string, bounds: { x: number; y: number; width: number; height: number }) => void;
   onConnect: (connection: Connection) => void; onInit: (instance: ReactFlowInstance<IdeaNode>) => void;
@@ -82,6 +82,7 @@ interface Props {
 }
 export function MapCanvas(props: Props) {
   const { workspace, selectedIds, selectedEdge, search } = props;
+  const additiveSelection = useRef(false);
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
   const initialNodes = useMemo(() => workspace.nodes.map(idea => ({ id: idea.id, type: 'idea' as const,
     position: idea.position, selected: selectedSet.has(idea.id), draggable: !idea.locked && props.editingId !== idea.id,
@@ -96,7 +97,7 @@ export function MapCanvas(props: Props) {
     // onSelectionChange also reports intermediate controlled-prop updates,
     // which can overwrite a newer sidebar or toolbar selection.
     if (changes.some(change => change.type === 'select')) {
-      props.onSelectMany(applyNodeChanges(changes, nodes).filter(node => node.selected).map(node => node.id));
+      props.onSelectMany(applyNodeChanges(changes, nodes).filter(node => node.selected).map(node => node.id), additiveSelection.current);
     }
   }, [nodes, onNodesChange, props.onSelectMany]);
   useEffect(() => setNodes(previous => {
@@ -131,10 +132,10 @@ export function MapCanvas(props: Props) {
       interactionWidth: 24,
     }];
   }), [workspace.edges, routes, selectedEdge]);
-  return <CardContext.Provider value={props}><PortContext.Provider value={ports}><div className="canvas" data-testid="canvas">
+  return <CardContext.Provider value={props}><PortContext.Provider value={ports}><div className="canvas" data-testid="canvas" onPointerDownCapture={e => { additiveSelection.current = e.ctrlKey || e.metaKey; }} onKeyDownCapture={e => { additiveSelection.current = e.ctrlKey || e.metaKey; }}>
     <ConnectionMarkers edges={workspace.edges} />
     <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} onNodesChange={handleNodesChange}
-      onNodeClick={(_, node) => props.onSelect(node.id)} onNodeDoubleClick={(event, node) => props.onBeginEditing(node.id, (event.target as HTMLElement).closest('.idea-title') ? 'title' : 'body')}
+      onNodeClick={(event, node) => props.onSelect(node.id, event.ctrlKey || event.metaKey)} onNodeDoubleClick={(event, node) => props.onBeginEditing(node.id, (event.target as HTMLElement).closest('.idea-title') ? 'title' : 'body')}
       onEdgeClick={(_, edge) => props.onEdgeSelect(edge.id)}
       onNodeContextMenu={(event, node) => { event.preventDefault(); props.onContextMenu('node', node.id, event.clientX, event.clientY); }}
       onEdgeContextMenu={(event, edge) => { event.preventDefault(); props.onContextMenu('edge', edge.id, event.clientX, event.clientY); }}

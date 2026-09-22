@@ -24,7 +24,7 @@ export function GroupInspector({ group, nodes, onName, onStyle, onMembers, onUng
       <h4>{members.length} cards in this group</h4>
       <div className="group-members">{members.map(n => <div key={n.id}><span title={n.title}>{n.title || 'Untitled idea'}{n.locked ? ' (pinned)' : ''}</span><button className="icon-button" aria-label={`Remove ${n.title || 'Untitled idea'} from group`} title="Remove from group" onClick={() => onMembers(group.nodeIds.filter(id => id !== n.id))}><X size={14} /></button></div>)}</div>
       <select className="group-add-card" aria-label="Add card to group" value="" onChange={e => { if (e.target.value) onMembers([...group.nodeIds, e.target.value]); }}><option value="">Add a card to this group...</option>{nodes.filter(n => !group.nodeIds.includes(n.id)).map(n => <option key={n.id} value={n.id}>{n.title || 'Untitled idea'}</option>)}</select>
-      <p className="section-description">Each card belongs to one group. Adding a grouped card moves it here.</p>
+      <p className="section-description">Cards can belong to several groups. Removing a card here keeps its other memberships.</p>
     </div></div>
     <div className="inspector-bottom"><button className="secondary" onClick={onUngroup}><Ungroup size={15} />Ungroup cards</button><p className="section-description">Keeps all cards, notes, and connections.</p></div>
   </aside>;

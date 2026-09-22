@@ -32,7 +32,7 @@ export function GroupRegions({ groups, members, selected, onSelect, onPreview, o
     if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
   }
   return <ViewportPortal><svg className="group-region-layer" width="1" height="1" aria-label="Card group boundaries">
-    {groups.map(group => {
+    {[...groups.filter(g => g.id !== selected), ...groups.filter(g => g.id === selected)].map(group => {
       const cards = members.filter(n => group.nodeIds.includes(n.id)), s = group.style;
       const geometry = regionGeometry(cards, s.padding, s.roundness); if (!geometry) return null;
       const active = selected === group.id, label = group.name.length > 28 ? `${group.name.slice(0, 27)}…` : group.name;
